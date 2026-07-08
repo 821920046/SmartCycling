@@ -85,7 +85,7 @@ dependencies {
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 
-    // 高德一体化 SDK:单个 AAR 已含 3D 地图 + 定位 + 搜索(地理编码/骑行路径规划)。
-    // 切勿再单独添加 3dmap/location/search,否则会因重复类(duplicate class)构建失败。
-    implementation("com.amap.api:navi-3dmap:latest.integration")
+    // 高德官方一体化合包:单个 AAR 已含 3D 地图 + 定位 + 搜索(地理编码/骑行路径规划)。
+    // 必须用带 -location-search 后缀的固定版本坐标(普通 navi-3dmap 不含搜索包、单独 3dmap/location/search 又会 duplicate class)。
+    implementation("com.amap.api:3dmap-location-search:10.1.200_loc6.4.9_sea9.7.4")
 }
