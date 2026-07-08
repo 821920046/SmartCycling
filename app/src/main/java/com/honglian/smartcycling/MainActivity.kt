@@ -19,6 +19,7 @@ import androidx.lifecycle.lifecycleScope
 import com.honglian.smartcycling.nav.AppNav
 import com.honglian.smartcycling.ride.RideService
 import com.honglian.smartcycling.ui.theme.SmartCyclingTheme
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -64,12 +65,9 @@ class MainActivity : ComponentActivity() {
         val repo = container.pairingRepository
         val manager = container.sensorManager
         lifecycleScope.launch {
-            repo.scan().collect { found ->
-                if (repo.isTargetSensor(found.name)) {
-                    manager.connectTo(found.device)
-                    return@collect
-                }
-            }
+            // 扫到第一个名称匹配的传感器后停止扫描(first 会取消上游 → awaitClose 停扫),再发起连接。
+            val target = repo.scan().first { repo.isTargetSensor(it.name) }
+            manager.connectTo(target.device)
         }
     }
 

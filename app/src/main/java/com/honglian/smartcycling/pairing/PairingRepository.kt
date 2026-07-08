@@ -3,8 +3,6 @@ package com.honglian.smartcycling.pairing
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
 import android.content.Context
-import android.os.ParcelUuid
-import com.honglian.smartcycling.ble.CscUuids
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -18,8 +16,8 @@ import no.nordicsemi.android.support.v18.scanner.ScanSettings
 data class DiscoveredDevice(val device: BluetoothDevice, val name: String, val rssi: Int)
 
 /**
- * 负责扫描支持 CSC 服务的传感器。优先过滤服务 UUID,
- * 再按名称(S314 / Magene)确认,实现“打开即自动配对”。
+ * 负责扫描支持 CSC 服务的传感器。扫描阶段不按服务 UUID 过滤
+ * (多数传感器广播包不含 0x1816),扫到后按名称(S314 / Magene)确认,实现“打开即自动配对”。
  */
 class PairingRepository(private val context: Context) {
 
@@ -27,9 +25,10 @@ class PairingRepository(private val context: Context) {
 
     @SuppressLint("MissingPermission")
     fun scan(): Flow<DiscoveredDevice> = callbackFlow {
-        val filters = listOf(
-            ScanFilter.Builder().setServiceUuid(ParcelUuid(CscUuids.SERVICE)).build(),
-        )
+        // 迈金 S314 等踏频/速度传感器通常不会在广播包里携带 CSC 服务 UUID(0x1816),
+        // 该服务只有连接后做 GATT 服务发现才可见。若按服务 UUID 过滤,onScanResult 将永远不触发
+        // → 永远扫不到设备。因此此处不加过滤,扫到后在回调里按名称确认。
+        val filters = emptyList<ScanFilter>()
         val settings = ScanSettings.Builder()
             .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
             .setReportDelay(0)
