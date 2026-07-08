@@ -9,6 +9,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.honglian.smartcycling.ble.ConnectionState
+import com.honglian.smartcycling.core.SettingsViewModel
 import com.honglian.smartcycling.map.MapViewModel
 import com.honglian.smartcycling.pairing.PairingViewModel
 import com.honglian.smartcycling.ride.RideViewModel
@@ -23,7 +24,7 @@ object Routes {
 }
 
 /**
- * 主导航图:配对 → 地图 → 骑行。
+ * 主导航图:配对 → 地图(搜索/预览路线) → 骑行。
  * @param onEnterRide / onExitRide 用于锁屏横屏与前台服务开关。
  */
 @Composable
@@ -35,11 +36,13 @@ fun AppNav(
     val pairingViewModel: PairingViewModel = viewModel()
     val rideViewModel: RideViewModel = viewModel()
     val mapViewModel: MapViewModel = viewModel()
+    val settingsViewModel: SettingsViewModel = viewModel()
 
     val connection by pairingViewModel.connection.collectAsState()
     val devices by pairingViewModel.devices.collectAsState()
     val routePoints by mapViewModel.route.collectAsState()
     val mapStatus by mapViewModel.status.collectAsState()
+    val currentWheel by settingsViewModel.wheel.collectAsState()
 
     NavHost(navController = navController, startDestination = Routes.PAIRING) {
         composable(Routes.PAIRING) {
@@ -61,12 +64,14 @@ fun AppNav(
             MapScreen(
                 routePoints = routePoints,
                 status = mapStatus,
-                onRide = { dest ->
-                    mapViewModel.planTo(dest)
+                currentWheel = currentWheel,
+                onSearch = { dest -> mapViewModel.planTo(dest) },
+                onStartRide = {
                     rideViewModel.startRide()
                     onEnterRide()
                     navController.navigate(Routes.RIDE)
                 },
+                onSelectWheel = { settingsViewModel.select(it) },
             )
         }
         composable(Routes.RIDE) {

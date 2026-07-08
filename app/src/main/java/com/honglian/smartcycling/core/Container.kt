@@ -14,9 +14,14 @@ import com.honglian.smartcycling.pairing.PairingRepository
 class Container(context: Context) {
     private val appContext = context.applicationContext
 
+    val settings: Settings by lazy { Settings(appContext) }
     val database: AppDatabase by lazy { AppDatabase.get(appContext) }
     val rideRepository: RideRepository by lazy { RideRepository(database.rideDao()) }
-    val sensorManager: S314Manager by lazy { S314Manager(appContext) }
+
+    /** 传感器创建时应用已保存的车轮周长。 */
+    val sensorManager: S314Manager by lazy {
+        S314Manager(appContext).apply { wheelCircumferenceM = settings.wheelCircumferenceM }
+    }
     val pairingRepository: PairingRepository by lazy { PairingRepository(appContext) }
     val locationTracker: LocationTracker by lazy { LocationTracker(appContext) }
 }

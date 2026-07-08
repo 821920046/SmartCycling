@@ -23,11 +23,11 @@ fun DataGrid(state: RideState, modifier: Modifier = Modifier) {
     Column(modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth()) {
             DataCell(Modifier.weight(1f), state.durationText, "骑行时长")
-            DataCell(Modifier.weight(1f), "%.0fKm".format(state.distanceKm), "骑行路程")
+            DataCell(Modifier.weight(1f), "%.2f km".format(state.distanceKm), "骑行路程")
         }
         HorizontalDivider()
         Row(Modifier.fillMaxWidth()) {
-            DataCell(Modifier.weight(1f), "%.0fKm/h".format(state.avgSpeedKmh), "平均速度")
+            DataCell(Modifier.weight(1f), "%.1f km/h".format(state.avgSpeedKmh), "平均速度")
             DataCell(Modifier.weight(1f), "${state.cadenceRpm.roundToInt()} rpm", "踏频频率")
         }
     }
@@ -36,7 +36,7 @@ fun DataGrid(state: RideState, modifier: Modifier = Modifier) {
 @Composable
 private fun DataCell(modifier: Modifier, value: String, label: String) {
     Column(modifier.padding(12.dp)) {
-        Text(value, fontSize = 30.sp, fontWeight = FontWeight.Bold, color = DataValue, fontFamily = FontFamily.Monospace)
+        Text(value, fontSize = 26.sp, fontWeight = FontWeight.Bold, color = DataValue, fontFamily = FontFamily.Monospace)
         Text(label, fontSize = 14.sp, color = DataLabel)
     }
 }

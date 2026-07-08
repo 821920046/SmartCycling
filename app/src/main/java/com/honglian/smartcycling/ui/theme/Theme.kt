@@ -7,12 +7,13 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-val RingBlue = Color(0xFF9DB4FF)
-val RingTrack = Color(0xFFE6E9F5)
-val SpeedText = Color(0xFFB3C0F0)
-val DataValue = Color(0xFF9AA3B2)
-val DataLabel = Color(0xFFB8BEC9)
-val DividerNavy = Color(0xFF1B2A4A)
+// 高对比度配色:骑行数据面板为白底,文字/圖环均为深色或鲜明蓝,确保清晰可见。
+val RingBlue = Color(0xFF2563EB)   // 速度环进度色
+val RingTrack = Color(0xFFE5E7EB)  // 速度环底色
+val SpeedText = Color(0xFF1D4ED8)  // 中心大字速度
+val DataValue = Color(0xFF111827)  // 数据数值(近黑)
+val DataLabel = Color(0xFF6B7280)  // 数据标签(中灰)
+val DividerNavy = Color(0xFFCBD5E1) // 左右分隔线
 
 private val LightColors = lightColorScheme(primary = RingBlue)
 private val DarkColors = darkColorScheme(primary = RingBlue)
