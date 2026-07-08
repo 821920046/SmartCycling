@@ -85,8 +85,7 @@ dependencies {
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 
-    // 高德:3D 地图 + 定位 + 搜索(地理编码/骑行路径规划)
-    implementation("com.amap.api:3dmap:latest.integration")
-    implementation("com.amap.api:location:latest.integration")
-    implementation("com.amap.api:search:latest.integration")
+    // 高德一体化 SDK:单个 AAR 已含 3D 地图 + 定位 + 搜索(地理编码/骑行路径规划)。
+    // 切勿再单独添加 3dmap/location/search,否则会因重复类(duplicate class)构建失败。
+    implementation("com.amap.api:navi-3dmap:latest.integration")
 }
