@@ -70,7 +70,7 @@ class S314Manager(context: Context) : BleManager(context) {
     fun connectTo(device: BluetoothDevice) {
         connect(device)
             .retry(3, 200)
-            // 首次连接必须用 autoConnect=false(直连,秒级建连);true 会让首连长时间挂起甚至连不上。
+            // 首次直连必须用 false:true 会让首次连接长时间挂起甚至连不上。
             .useAutoConnect(false)
             .timeout(15_000)
             .enqueue()
