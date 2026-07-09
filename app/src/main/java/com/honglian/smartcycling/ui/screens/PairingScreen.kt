@@ -158,7 +158,7 @@ fun PairingScreen(
                     if (!locationOn) Text("• 定位服务未开启", fontSize = 15.sp)
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "“智慧骑行”需要蓝牙连接踏频传感器、需要定位进行导航。请开启后返回,应用会自动继续。",
+                        "“智能骑行”需要蓝牙连接踏频传感器、需要定位进行导航。请开启后返回,应用会自动继续。",
                         fontSize = 13.sp,
                     )
                 }

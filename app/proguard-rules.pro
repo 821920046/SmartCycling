@@ -1,4 +1,4 @@
-# 智慧骑行 ProGuard 规则
+# 智能骑行 ProGuard 规则
 # Room
 -keep class * extends androidx.room.RoomDatabase
 -keep @androidx.room.Entity class *

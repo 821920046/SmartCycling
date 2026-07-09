@@ -1,6 +1,6 @@
 <resources>
-    <string name="app_name">智慧骑行</string>
+    <string name="app_name">智能骑行</string>
     <string name="ride_channel_name">骑行记录</string>
-    <string name="ride_notification_title">智慧骑行记录中</string>
+    <string name="ride_notification_title">智能骑行记录中</string>
     <string name="ride_notification_text">GPS 与传感器数据正在记录</string>
 </resources>
