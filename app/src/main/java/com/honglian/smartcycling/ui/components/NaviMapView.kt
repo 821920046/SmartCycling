@@ -64,6 +64,8 @@ fun NaviMapView(
 
     DisposableEffect(lifecycleOwner) {
         runCatching { naviView.onCreate(Bundle()) }
+        // 夜间深色地图,与整体深色 HUD 保持一致
+        runCatching { naviView.map.mapType = com.amap.api.maps.AMap.MAP_TYPE_NIGHT }
         // 自动锁车:相机始终跟随并居中当前车辆位置,不停留在全览模式
         runCatching {
             val options = naviView.viewOptions

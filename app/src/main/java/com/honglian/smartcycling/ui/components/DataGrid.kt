@@ -16,6 +16,7 @@ import com.honglian.smartcycling.ride.RideState
 import com.honglian.smartcycling.ride.SensorMode
 import com.honglian.smartcycling.ui.theme.DataLabel
 import com.honglian.smartcycling.ui.theme.DataValue
+import com.honglian.smartcycling.ui.theme.DividerNavy
 import kotlin.math.roundToInt
 
 /** 2x2 数据网格:骑行时长 / 骑行路程 / 平均速度 / 踏频频率。紧凑排版,保证仪表盘整屏可见。 */
@@ -26,7 +27,7 @@ fun DataGrid(state: RideState, modifier: Modifier = Modifier) {
             DataCell(Modifier.weight(1f), state.durationText, "骑行时长")
             DataCell(Modifier.weight(1f), "%.2f km".format(state.distanceKm), "骑行路程")
         }
-        HorizontalDivider()
+        HorizontalDivider(color = DividerNavy)
         val cadenceMode = state.sensorMode == SensorMode.CADENCE
         Row(Modifier.fillMaxWidth()) {
             DataCell(Modifier.weight(1f), "%.1f km/h".format(state.avgSpeedKmh), "平均速度")

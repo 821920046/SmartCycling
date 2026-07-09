@@ -12,14 +12,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -32,9 +35,14 @@ import com.honglian.smartcycling.ui.components.DataGrid
 import com.honglian.smartcycling.ui.components.NaviMapView
 import com.honglian.smartcycling.ui.components.NavigationMapView
 import com.honglian.smartcycling.ui.components.SpeedRing
+import com.honglian.smartcycling.ui.theme.BrandCyan
+import com.honglian.smartcycling.ui.theme.CardBg
 import com.honglian.smartcycling.ui.theme.DataLabel
+import com.honglian.smartcycling.ui.theme.DividerNavy
 import com.honglian.smartcycling.ui.theme.PanelBg
-import com.honglian.smartcycling.ui.theme.RingBlue
+import com.honglian.smartcycling.ui.theme.PanelBgBottom
+import com.honglian.smartcycling.ui.theme.PanelBgTop
+import com.honglian.smartcycling.ui.theme.StopRed
 import kotlin.math.min
 
 /**
@@ -55,7 +63,7 @@ fun RideScreen(
     onStop: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(modifier.fillMaxSize()) {
+    Row(modifier.fillMaxSize().background(PanelBg)) {
         // 左:导航
         Box(Modifier.weight(1.3f).fillMaxHeight()) {
             if (destination != null) {
@@ -69,8 +77,8 @@ fun RideScreen(
                 Surface(
                     onClick = onToggleVoice,
                     shape = RoundedCornerShape(22.dp),
-                    color = if (voiceEnabled) RingBlue else Color(0xFF9CA3AF),
-                    contentColor = Color.White,
+                    color = if (voiceEnabled) BrandCyan else Color(0xFF37424F),
+                    contentColor = if (voiceEnabled) Color(0xFF04121A) else Color.White,
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .safeDrawingPadding()
@@ -92,12 +100,14 @@ fun RideScreen(
                 )
             }
         }
+        // 左右之间的细分隔线,让地图与仪表盘有自然过渡
+        Box(Modifier.fillMaxHeight().width(1.dp).background(DividerNavy))
         // 右:数据仪表盘(按屏幕高度自适应,保证不滚动即可整屏显示)
         BoxWithConstraints(
             Modifier
                 .weight(1f)
                 .fillMaxHeight()
-                .background(PanelBg)
+                .background(Brush.verticalGradient(listOf(PanelBgTop, PanelBgBottom)))
                 .safeDrawingPadding(),
         ) {
             // 预留"标签+数据卡+结束按钮+间距"所需高度,其余高度给速度环;并按面板宽度上限收敛
@@ -126,14 +136,18 @@ fun RideScreen(
                     fontSize = 11.sp,
                     color = DataLabel,
                 )
-                Card(Modifier.fillMaxWidth()) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = CardBg),
+                ) {
                     DataGrid(state, Modifier.padding(vertical = 2.dp))
                 }
                 Spacer(Modifier.weight(1f))
                 Surface(
                     onClick = onStop,
                     shape = RoundedCornerShape(12.dp),
-                    color = RingBlue,
+                    color = StopRed,
                     contentColor = Color.White,
                     modifier = Modifier.fillMaxWidth().height(46.dp).zIndex(2f),
                 ) {

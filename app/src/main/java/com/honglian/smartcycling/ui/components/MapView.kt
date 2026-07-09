@@ -51,6 +51,8 @@ fun NavigationMapView(
     DisposableEffect(lifecycleOwner) {
         mapView.onCreate(Bundle())
         val aMap: AMap = mapView.map
+        // 夜间深色地图样式,与整体深色 HUD 保持一致
+        runCatching { aMap.mapType = AMap.MAP_TYPE_NIGHT }
         // 提供外部定位(followLocation)时不启用高德内置定位图层,改由外部定位驱动。
         if (showMyLocation && followLocation == null) {
             val type = when {
@@ -90,7 +92,7 @@ fun NavigationMapView(
                 PolylineOptions()
                     .addAll(routePoints)
                     .width(20f)
-                    .color(0xFF2563EB.toInt()),
+                    .color(0xFF34D399.toInt()),
             )
             // 预览模式才自适应整条路线(含目的地);导航模式交由定位跟随控制镜头。
             if (!follow) {
