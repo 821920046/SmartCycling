@@ -20,19 +20,19 @@ import com.amap.api.maps.model.MyLocationStyle
 import com.amap.api.maps.model.PolylineOptions
 
 /**
- * 高德地图导航视图(Compose 包装)。
- * - 显示当前位置蓝点(需定位权限 + 高德 Key)。
- * - 传入 routePoints 时绘制骑行路线并自动调整视野。
+ * 高德地图视图(Compose 包装)。
  *
- * 修复“地图一直跳动”:
- * - 路线绘制与移镜头只在 routePoints 变化时执行一次(LaunchedEffect),
- *   不再放在每帧都会运行的 update 块里。
- * - 定位蓝点用 LOCATION_TYPE_SHOW,不随朝向旋转/不抢镜头。
+ * @param routePoints 传入时绘制骑行路线。
+ * @param follow 骑行导航模式:地图实时跟随当前位置、放大到街道级;
+ *   预览模式(false)则只显示蓝点并把整条路线自适应到视野。
+ *
+ * 防抖动:路线绘制只在 routePoints 变化时执行一次(LaunchedEffect),不放在每帧 update 块。
  */
 @Composable
 fun NavigationMapView(
     modifier: Modifier = Modifier,
     routePoints: List<LatLng> = emptyList(),
+    follow: Boolean = false,
     showMyLocation: Boolean = true,
 ) {
     val context = LocalContext.current
@@ -43,12 +43,15 @@ fun NavigationMapView(
         mapView.onCreate(Bundle())
         val aMap: AMap = mapView.map
         if (showMyLocation) {
-            aMap.myLocationStyle = MyLocationStyle()
-                .myLocationType(MyLocationStyle.LOCATION_TYPE_SHOW)
-                .interval(2000)
+            val type =
+                if (follow) MyLocationStyle.LOCATION_TYPE_FOLLOW
+                else MyLocationStyle.LOCATION_TYPE_SHOW
+            aMap.myLocationStyle = MyLocationStyle().myLocationType(type).interval(1000)
             aMap.isMyLocationEnabled = true
         }
         aMap.uiSettings.isZoomControlsEnabled = false
+        aMap.uiSettings.isMyLocationButtonEnabled = false
+        if (follow) aMap.moveCamera(CameraUpdateFactory.zoomTo(17f))
 
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
@@ -64,7 +67,6 @@ fun NavigationMapView(
         }
     }
 
-    // 仅在路线变化时重绘并调整视野一次,避免每帧重绘导致地图“跳动”。
     LaunchedEffect(routePoints) {
         val aMap = mapView.map ?: return@LaunchedEffect
         aMap.clear(true)
@@ -72,12 +74,15 @@ fun NavigationMapView(
             aMap.addPolyline(
                 PolylineOptions()
                     .addAll(routePoints)
-                    .width(18f)
+                    .width(20f)
                     .color(0xFF2563EB.toInt()),
             )
-            val builder = LatLngBounds.Builder()
-            routePoints.forEach { builder.include(it) }
-            aMap.moveCamera(CameraUpdateFactory.newLatLngBounds(builder.build(), 120))
+            // 预览模式才自适应整条路线;导航模式交由定位跟随控制镜头。
+            if (!follow) {
+                val builder = LatLngBounds.Builder()
+                routePoints.forEach { builder.include(it) }
+                aMap.moveCamera(CameraUpdateFactory.newLatLngBounds(builder.build(), 120))
+            }
         }
     }
 

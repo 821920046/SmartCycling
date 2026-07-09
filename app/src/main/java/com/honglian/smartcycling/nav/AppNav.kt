@@ -4,6 +4,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -24,7 +27,7 @@ object Routes {
 }
 
 /**
- * 主导航图:配对 → 地图(搜索/预览路线) → 骑行。
+ * 主导航图:配对 → 地图(搜索/预览路线) → 骑行(turn-by-turn 导航)。
  * @param onEnterRide / onExitRide 用于锁屏横屏与前台服务开关。
  */
 @Composable
@@ -41,8 +44,12 @@ fun AppNav(
     val connection by pairingViewModel.connection.collectAsState()
     val devices by pairingViewModel.devices.collectAsState()
     val routePoints by mapViewModel.route.collectAsState()
+    val destination by mapViewModel.destination.collectAsState()
     val mapStatus by mapViewModel.status.collectAsState()
     val currentWheel by settingsViewModel.wheel.collectAsState()
+
+    // 语音导航开关(跨横竖屏重建保持)
+    var voiceEnabled by rememberSaveable { mutableStateOf(true) }
 
     NavHost(navController = navController, startDestination = Routes.PAIRING) {
         composable(Routes.PAIRING) {
@@ -79,6 +86,9 @@ fun AppNav(
             RideScreen(
                 state = state,
                 routePoints = routePoints,
+                destination = destination,
+                voiceEnabled = voiceEnabled,
+                onToggleVoice = { voiceEnabled = !voiceEnabled },
                 onStop = {
                     rideViewModel.stopRide()
                     onExitRide()

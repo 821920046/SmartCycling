@@ -9,7 +9,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -40,7 +42,6 @@ import com.honglian.smartcycling.ui.components.NavigationMapView
  * 地图主界面(两步式):
  * 1) 顶部搜索栏输入目的地 → 地图上预览路线 + 预计里程。
  * 2) 底部“开始骑行”→ 进入骑行数据界面。
- * 另提供车轮尺寸设置(影响实时速度/里程计算)。
  */
 @Composable
 fun MapScreen(
@@ -60,11 +61,12 @@ fun MapScreen(
     Box(modifier.fillMaxSize()) {
         NavigationMapView(modifier = Modifier.fillMaxSize(), routePoints = routePoints)
 
-        // 顶部搜索卡片
+        // 顶部搜索卡片(避开状态栏)
         Card(
             Modifier
                 .fillMaxWidth()
                 .align(Alignment.TopCenter)
+                .statusBarsPadding()
                 .padding(12.dp),
         ) {
             Column(Modifier.padding(12.dp)) {
@@ -97,11 +99,12 @@ fun MapScreen(
             }
         }
 
-        // 底部开始骑行
+        // 底部开始骑行(避开导航栏)
         Column(
             Modifier
                 .fillMaxWidth()
                 .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {

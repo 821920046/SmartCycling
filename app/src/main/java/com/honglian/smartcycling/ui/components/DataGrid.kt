@@ -35,8 +35,8 @@ fun DataGrid(state: RideState, modifier: Modifier = Modifier) {
 
 @Composable
 private fun DataCell(modifier: Modifier, value: String, label: String) {
-    Column(modifier.padding(12.dp)) {
-        Text(value, fontSize = 26.sp, fontWeight = FontWeight.Bold, color = DataValue, fontFamily = FontFamily.Monospace)
-        Text(label, fontSize = 14.sp, color = DataLabel)
+    Column(modifier.padding(10.dp)) {
+        Text(value, fontSize = 21.sp, fontWeight = FontWeight.Bold, color = DataValue, fontFamily = FontFamily.Monospace)
+        Text(label, fontSize = 13.sp, color = DataLabel)
     }
 }
