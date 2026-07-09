@@ -24,9 +24,10 @@ import com.amap.api.navi.model.NaviLatLng
 /**
  * 完整 turn-by-turn 骑行导航视图(基于 AMapNaviView)。
  * - 自动展示转向箭头、车道信息、剩余距离/时间等导航 UI。
- * - 开启自动锁车(autoLockCar):相机始终跟随并居中当前车辆位置(街道级),不停在全览。
- * - 语音使用高德内置语音播报(setUseInnerVoice),最稳定、无需系统 TTS 引擎;由 voiceEnabled 实时开关。
- * - 传入 startPoint(真实当前定位)作为算路起点,避免导航默认落到北京。经纬度骑行算路为免费接口。
+ * - 开启自动锁车(autoLockCar):相机始终跟随并居中当前车辆位置(街道级)。
+ * - 语音使用高德内置语音播报(setUseInnerVoice),由 voiceEnabled 实时开关。
+ * - 健壮性:若导航 SDK 初始化失败(如 Key 未开通导航权限),
+ *   自动回退到普通跟随地图,绝不闪退。
  */
 @Composable
 fun NaviMapView(
@@ -38,13 +39,26 @@ fun NaviMapView(
     val context = LocalContext.current
     val appContext = context.applicationContext
     val lifecycleOwner = LocalLifecycleOwner.current
-    val naviView = remember { AMapNaviView(context) }
+
+    // 导航视图/实例创建可能因 Key 未开通导航、资源缺失等抛异常。
+    // 一律 runCatching 兑底,失败则 naviView 为 null 并回退到跟随地图。
+    val naviView = remember { runCatching { AMapNaviView(context) }.getOrNull() }
     val navi = remember { runCatching { AMapNavi.getInstance(appContext) }.getOrNull() }
     val destState = rememberUpdatedState(destination)
     val startState = rememberUpdatedState(startPoint)
 
+    if (naviView == null) {
+        // 回退:普通跟随地图 + 目的地标记(仍可正常骑行,只是无转向语音)
+        NavigationMapView(
+            modifier = modifier,
+            destination = destination,
+            follow = true,
+        )
+        return
+    }
+
     DisposableEffect(lifecycleOwner) {
-        naviView.onCreate(Bundle())
+        runCatching { naviView.onCreate(Bundle()) }
         // 自动锁车:相机始终跟随并居中当前车辆位置,不停留在全览模式
         runCatching {
             val options = naviView.viewOptions
@@ -54,16 +68,15 @@ fun NaviMapView(
         var attachedListener: SimpleNaviListener? = null
         if (navi != null) {
             val listener = NaviCallbacks(navi, destState, startState)
-            navi.addAMapNaviListener(listener)
+            runCatching { navi.addAMapNaviListener(listener) }
             attachedListener = listener
-            // 默认开启内置语音播报
             runCatching { navi.setUseInnerVoice(voiceEnabled, false) }
         }
 
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_RESUME -> naviView.onResume()
-                Lifecycle.Event.ON_PAUSE -> naviView.onPause()
+                Lifecycle.Event.ON_RESUME -> runCatching { naviView.onResume() }
+                Lifecycle.Event.ON_PAUSE -> runCatching { naviView.onPause() }
                 else -> Unit
             }
         }
@@ -73,10 +86,10 @@ fun NaviMapView(
             lifecycleOwner.lifecycle.removeObserver(observer)
             val l = attachedListener
             if (navi != null && l != null) {
-                navi.stopNavi()
-                navi.removeAMapNaviListener(l)
+                runCatching { navi.stopNavi() }
+                runCatching { navi.removeAMapNaviListener(l) }
             }
-            naviView.onDestroy()
+            runCatching { naviView.onDestroy() }
             runCatching { AMapNavi.destroy() }
         }
     }
@@ -91,7 +104,6 @@ fun NaviMapView(
 
 /**
  * 导航回调(继承官方空实现适配器 SimpleNaviListener,仅重写所需方法)。
- * 以构造参传入非空 AMapNavi,避免闭包中的可空智能转换问题。
  */
 private class NaviCallbacks(
     private val navi: AMapNavi,
@@ -101,18 +113,19 @@ private class NaviCallbacks(
     override fun onInitNaviSuccess() {
         val d = destination.value
         val s = startPoint.value
-        if (s != null) {
-            // 带真实起点算路:导航从用户当前位置开始,而非默认北京
-            navi.calculateRideRoute(
-                NaviLatLng(s.latitude, s.longitude),
-                NaviLatLng(d.latitude, d.longitude),
-            )
-        } else {
-            navi.calculateRideRoute(NaviLatLng(d.latitude, d.longitude))
+        runCatching {
+            if (s != null) {
+                navi.calculateRideRoute(
+                    NaviLatLng(s.latitude, s.longitude),
+                    NaviLatLng(d.latitude, d.longitude),
+                )
+            } else {
+                navi.calculateRideRoute(NaviLatLng(d.latitude, d.longitude))
+            }
         }
     }
 
     override fun onCalculateRouteSuccess(routeResult: AMapCalcRouteResult?) {
-        navi.startNavi(NaviType.GPS)
+        runCatching { navi.startNavi(NaviType.GPS) }
     }
 }

@@ -54,9 +54,10 @@ android {
             signingConfig = signingConfigs.getByName("shared")
         }
         release {
-            isMinifyEnabled = true
-            // 资源压缩:移除未引用资源,进一步缩小安装包。
-            isShrinkResources = true
+            // 高德导航 SDK 在 R8 混淆/资源压缩下极易崩溃(调试版导航正常、Release 混淆后闪退)。
+            // 关闭混淆与资源压缩以保证导航稳定;安装包体积主要由 ABI 过滤控制(已去掉 x86)。
+            isMinifyEnabled = false
+            isShrinkResources = false
             signingConfig = signingConfigs.getByName("shared")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.os.Build
 import com.amap.api.location.AMapLocationClient
 import com.amap.api.maps.MapsInitializer
+import com.amap.api.navi.NaviSetting
 import com.amap.api.services.core.ServiceSettings
 import com.honglian.smartcycling.core.Container
 import com.honglian.smartcycling.core.CrashHandler
@@ -36,6 +37,9 @@ class SmartCyclingApp : Application() {
             ServiceSettings.updatePrivacyAgree(this, true)
             AMapLocationClient.updatePrivacyShow(this, true, true)
             AMapLocationClient.updatePrivacyAgree(this, true)
+            // 导航 SDK 有独立的隐私合规开关:不设置会导致创建导航视图(AMapNaviView)时闪退
+            NaviSetting.updatePrivacyShow(this, true, true)
+            NaviSetting.updatePrivacyAgree(this, true)
         }
     }
 

@@ -37,11 +37,16 @@ fun SpeedRing(
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = "${speedKmh.roundToInt()}",
-                fontSize = (diameterDp / 4.2f).sp,
+                fontSize = (diameterDp / 3.4f).sp,
                 fontWeight = FontWeight.Bold,
                 color = SpeedText,
             )
-            Text(text = "km/h", fontSize = (diameterDp / 13f).sp, color = DataLabel)
+            Text(
+                text = "km/h",
+                fontSize = (diameterDp / 10f).sp,
+                fontWeight = FontWeight.Bold,
+                color = DataLabel,
+            )
         }
     }
 }

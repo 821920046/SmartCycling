@@ -57,7 +57,7 @@ fun NavigationMapView(
         }
         aMap.uiSettings.isZoomControlsEnabled = false
         aMap.uiSettings.isMyLocationButtonEnabled = false
-        if (follow) aMap.moveCamera(CameraUpdateFactory.zoomTo(17f))
+        if (follow) aMap.moveCamera(CameraUpdateFactory.zoomTo(16f))
 
         val observer = LifecycleEventObserver { _, event ->
             when (event) {

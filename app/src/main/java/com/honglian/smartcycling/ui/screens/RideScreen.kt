@@ -97,8 +97,8 @@ fun RideScreen(
                 .safeDrawingPadding(),
         ) {
             // 预留"标签+数据卡+结束按钮+间距"所需高度,其余高度给速度环;并按面板宽度上限收敛
-            val maxRing = min(maxWidth.value * 0.72f, 156f).coerceAtLeast(84f)
-            val ring = (maxHeight - 210.dp).coerceIn(84.dp, maxRing.dp)
+            val maxRing = min(maxWidth.value * 0.88f, 224f).coerceAtLeast(96f)
+            val ring = (maxHeight - 188.dp).coerceIn(96.dp, maxRing.dp)
             Column(
                 Modifier
                     .fillMaxSize()
