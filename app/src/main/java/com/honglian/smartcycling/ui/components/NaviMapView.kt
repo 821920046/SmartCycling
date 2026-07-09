@@ -70,6 +70,13 @@ fun NaviMapView(
             options.setAutoLockCar(true)
             naviView.viewOptions = options
         }
+        // 只把黑色转向面板等原生“控件盒子”的背景置为透明:
+        // 保留其中的转向箭头/距离/路名/速度圈等全部控件与文字,仅黑底变透明、透出地图。
+        // 用 OnGlobalLayoutListener 反复应用,确保面板在导航开始后被创建时也能生效。
+        val transparencyListener = android.view.ViewTreeObserver.OnGlobalLayoutListener {
+            runCatching { makeNaviPanelsTransparent(naviView) }
+        }
+        runCatching { naviView.viewTreeObserver.addOnGlobalLayoutListener(transparencyListener) }
         var attachedListener: SimpleNaviListener? = null
         if (navi != null) {
             // 关键:必须在 startNavi 之前开启外部GPS模式,
@@ -92,6 +99,7 @@ fun NaviMapView(
 
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
+            runCatching { naviView.viewTreeObserver.removeOnGlobalLayoutListener(transparencyListener) }
             val l = attachedListener
             if (navi != null && l != null) {
                 runCatching { navi.stopNavi() }
@@ -163,5 +171,29 @@ private class NaviCallbacks(
 
     override fun onCalculateRouteSuccess(routeResult: AMapCalcRouteResult?) {
         runCatching { navi.startNavi(NaviType.GPS) }
+    }
+}
+
+/**
+ * 递归把 AMapNaviView 里所有“控件容器(ViewGroup)”的背景置为透明,
+ * 让左侧黑色转向面板等原生面板的深色底透明化、透出地图;
+ * 但不触碰地图渲染层(MapView/SurfaceView/TextureView),也不影响面板内的
+ * 图标/文字/速度表(它们是叶子视图或自绘视图,清除背景不影响其内容)。
+ */
+private fun makeNaviPanelsTransparent(view: android.view.View) {
+    val name = view.javaClass.name
+    // 跳过地图渲染层,避免影响地图显示
+    if (name.contains("MapView", ignoreCase = true) ||
+        name.contains("SurfaceView", ignoreCase = true) ||
+        name.contains("TextureView", ignoreCase = true) ||
+        name.contains("GLSurface", ignoreCase = true)
+    ) {
+        return
+    }
+    if (view is android.view.ViewGroup) {
+        runCatching { view.setBackgroundColor(android.graphics.Color.TRANSPARENT) }
+        for (i in 0 until view.childCount) {
+            makeNaviPanelsTransparent(view.getChildAt(i))
+        }
     }
 }
