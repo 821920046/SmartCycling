@@ -48,6 +48,7 @@ fun RideScreen(
     routePoints: List<LatLng> = emptyList(),
     destination: LatLng? = null,
     startPoint: LatLng? = null,
+    currentLatLng: LatLng? = null,
     voiceEnabled: Boolean = true,
     onToggleVoice: () -> Unit = {},
     onStop: () -> Unit,
@@ -61,6 +62,7 @@ fun RideScreen(
                     destination = destination,
                     voiceEnabled = voiceEnabled,
                     startPoint = startPoint,
+                    currentLatLng = currentLatLng,
                     modifier = Modifier.fillMaxSize(),
                 )
                 Surface(
@@ -85,6 +87,7 @@ fun RideScreen(
                     modifier = Modifier.fillMaxSize(),
                     routePoints = routePoints,
                     follow = true,
+                    followLocation = currentLatLng,
                 )
             }
         }

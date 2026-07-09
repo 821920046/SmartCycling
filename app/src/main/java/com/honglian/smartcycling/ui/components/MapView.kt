@@ -1,9 +1,11 @@
 package com.honglian.smartcycling.ui.components
 
+import android.content.Context
 import android.os.Bundle
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -13,9 +15,11 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.amap.api.maps.AMap
 import com.amap.api.maps.CameraUpdateFactory
+import com.amap.api.maps.CoordinateConverter
 import com.amap.api.maps.TextureMapView
 import com.amap.api.maps.model.LatLng
 import com.amap.api.maps.model.LatLngBounds
+import com.amap.api.maps.model.Marker
 import com.amap.api.maps.model.MarkerOptions
 import com.amap.api.maps.model.MyLocationStyle
 import com.amap.api.maps.model.PolylineOptions
@@ -37,6 +41,8 @@ fun NavigationMapView(
     destination: LatLng? = null,
     follow: Boolean = false,
     showMyLocation: Boolean = true,
+    /** 传入真实定位(WGS-84)时,用它驱动镜头跟随与“我的位置”标记,不依赖高德内置定位。 */
+    followLocation: LatLng? = null,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -45,7 +51,8 @@ fun NavigationMapView(
     DisposableEffect(lifecycleOwner) {
         mapView.onCreate(Bundle())
         val aMap: AMap = mapView.map
-        if (showMyLocation) {
+        // 提供外部定位(followLocation)时不启用高德内置定位图层,改由外部定位驱动。
+        if (showMyLocation && followLocation == null) {
             val type = when {
                 follow -> MyLocationStyle.LOCATION_TYPE_FOLLOW
                 // 预览且尚无路线/目的地:定位并将镜头居中到当前位置
@@ -98,5 +105,27 @@ fun NavigationMapView(
         }
     }
 
+    // 用真实定位(WGS-84→GCJ-02)驱动镜头跟随与“我的位置”标记,不依赖高德内置定位。
+    val myMarker = remember { mutableStateOf<Marker?>(null) }
+    LaunchedEffect(followLocation) {
+        val aMap = mapView.map ?: return@LaunchedEffect
+        val wgs = followLocation ?: return@LaunchedEffect
+        val gcj = toGcj02(context, wgs)
+        runCatching { myMarker.value?.remove() }
+        myMarker.value = runCatching {
+            aMap.addMarker(MarkerOptions().position(gcj).title("我的位置"))
+        }.getOrNull()
+        if (follow) runCatching { aMap.moveCamera(CameraUpdateFactory.newLatLngZoom(gcj, 17f)) }
+    }
+
     AndroidView(factory = { mapView }, modifier = modifier)
 }
+
+/** 将 WGS-84(GPS)坐标转换为高德 GCJ-02 坐标;转换失败则原样返回。 */
+internal fun toGcj02(context: Context, wgs: LatLng): LatLng =
+    runCatching {
+        CoordinateConverter(context)
+            .from(CoordinateConverter.CoordType.GPS)
+            .coord(wgs)
+            .convert()
+    }.getOrNull() ?: wgs

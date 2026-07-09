@@ -1,5 +1,7 @@
 package com.honglian.smartcycling.ui.components
 
+import android.location.Location
+import android.location.LocationManager
 import android.os.Bundle
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -34,6 +36,7 @@ fun NaviMapView(
     destination: LatLng,
     voiceEnabled: Boolean,
     startPoint: LatLng? = null,
+    currentLatLng: LatLng? = null,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -53,6 +56,7 @@ fun NaviMapView(
             modifier = modifier,
             destination = destination,
             follow = true,
+            followLocation = currentLatLng,
         )
         return
     }
@@ -91,6 +95,25 @@ fun NaviMapView(
             }
             runCatching { naviView.onDestroy() }
             runCatching { AMapNavi.destroy() }
+        }
+    }
+
+    // 第一性原理修复“地图停在北京”:高德内置定位在部分设备拿不到实时点,
+    // 改用我们自己可靠的 FusedLocation(WGS-84)→转高德坐标(GCJ-02)→喂给导航,
+    // 车标与镜头即跟随真实位置。setExtraGPSData 的 type=2 表示高德坐标。
+    LaunchedEffect(currentLatLng, navi) {
+        val n = navi ?: return@LaunchedEffect
+        val wgs = currentLatLng ?: return@LaunchedEffect
+        runCatching {
+            n.setIsUseExtraGPSData(true)
+            val gcj = toGcj02(context, wgs)
+            val loc = Location(LocationManager.GPS_PROVIDER).apply {
+                latitude = gcj.latitude
+                longitude = gcj.longitude
+                accuracy = 5f
+                time = System.currentTimeMillis()
+            }
+            n.setExtraGPSData(2, loc)
         }
     }
 

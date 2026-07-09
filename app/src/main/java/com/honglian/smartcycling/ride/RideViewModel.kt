@@ -3,6 +3,7 @@ package com.honglian.smartcycling.ride
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.amap.api.maps.model.LatLng
 import com.honglian.smartcycling.SmartCyclingApp
 import com.honglian.smartcycling.data.RideEntity
 import com.honglian.smartcycling.data.TrackPointEntity
@@ -34,6 +35,10 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _state = MutableStateFlow(RideState())
     val state: StateFlow<RideState> = _state.asStateFlow()
+
+    /** 当前真实定位(WGS-84,取自 FusedLocation),用于驱动导航地图跟随真实位置。 */
+    private val _currentLatLng = MutableStateFlow<LatLng?>(null)
+    val currentLatLng: StateFlow<LatLng?> = _currentLatLng.asStateFlow()
 
     private var rideJob: Job? = null
     private val trackPoints = mutableListOf<TrackPointEntity>()
@@ -76,6 +81,7 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
         location.track().collect { sample: LocationSample ->
             lastGpsSpeed = sample.speedKmh
             lastGpsAt = System.currentTimeMillis()
+            _currentLatLng.value = LatLng(sample.latitude, sample.longitude)
             distanceMeters += sample.deltaMeters
             trackPoints += TrackPointEntity(
                 rideId = 0,

@@ -85,11 +85,13 @@ fun AppNav(
         }
         composable(Routes.RIDE) {
             val state by rideViewModel.state.collectAsState()
+            val currentLatLng by rideViewModel.currentLatLng.collectAsState()
             RideScreen(
                 state = state,
                 routePoints = routePoints,
                 destination = destination,
                 startPoint = startPoint,
+                currentLatLng = currentLatLng,
                 voiceEnabled = voiceEnabled,
                 onToggleVoice = { voiceEnabled = !voiceEnabled },
                 onStop = {
