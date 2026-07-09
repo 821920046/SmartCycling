@@ -16,6 +16,7 @@ enum class ConnectionState { DISCONNECTED, CONNECTING, READY, DISCONNECTING }
 /**
  * 迈金 S314 传感器的 BLE 管理器(基于 Nordic Android-BLE-Library)。
  * 订阅 CSC Measurement,实时输出解析后的 [SensorReading]。
+ * 支持非人为断连(信号丢失)后自动重连。
  */
 class S314Manager(context: Context) : BleManager(context) {
 
@@ -28,6 +29,13 @@ class S314Manager(context: Context) : BleManager(context) {
     private val _connection = MutableStateFlow(ConnectionState.DISCONNECTED)
     val connection: StateFlow<ConnectionState> = _connection.asStateFlow()
 
+    /** 最近一次连接的设备,用于断连后自动重连。 */
+    private var lastDevice: BluetoothDevice? = null
+
+    /** 用户主动断开时不重连。 */
+    @Volatile
+    private var userRequestedDisconnect = false
+
     var wheelCircumferenceM: Double
         get() = calculator.wheelCircumferenceM
         set(value) { calculator.wheelCircumferenceM = value }
@@ -39,7 +47,18 @@ class S314Manager(context: Context) : BleManager(context) {
             override fun onDeviceFailedToConnect(device: BluetoothDevice, reason: Int) { _connection.value = ConnectionState.DISCONNECTED }
             override fun onDeviceReady(device: BluetoothDevice) { _connection.value = ConnectionState.READY }
             override fun onDeviceDisconnecting(device: BluetoothDevice) { _connection.value = ConnectionState.DISCONNECTING }
-            override fun onDeviceDisconnected(device: BluetoothDevice, reason: Int) { _connection.value = ConnectionState.DISCONNECTED }
+            override fun onDeviceDisconnected(device: BluetoothDevice, reason: Int) {
+                _connection.value = ConnectionState.DISCONNECTED
+                // 非人为断连(如信号丢失)则自动重连
+                if (!userRequestedDisconnect && reason == ConnectionObserver.REASON_LINK_LOSS) {
+                    lastDevice?.let { d ->
+                        connect(d)
+                            .useAutoConnect(true)
+                            .retry(3, 300)
+                            .enqueue()
+                    }
+                }
+            }
         })
     }
 
@@ -68,6 +87,8 @@ class S314Manager(context: Context) : BleManager(context) {
     }
 
     fun connectTo(device: BluetoothDevice) {
+        lastDevice = device
+        userRequestedDisconnect = false
         connect(device)
             .retry(3, 200)
             // 首次直连必须用 false:true 会让首次连接长时间挂起甚至连不上。
@@ -77,6 +98,7 @@ class S314Manager(context: Context) : BleManager(context) {
     }
 
     fun disconnectDevice() {
+        userRequestedDisconnect = true
         disconnect().enqueue()
     }
 }

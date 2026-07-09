@@ -21,6 +21,7 @@ import kotlinx.coroutines.launch
  * - 速度来源自适应:若 3 秒内收到轮转传感器速度则用传感器,否则回退 GPS。
  * - 里程优先用 GPS 积分(精度高);无定位时用轮转圈数 × 轮周长回退。
  * - 看门狗:任何数据源 3 秒无更新则归零,避免“停车但速度不降”。
+ * - 结束骑行:先存本地,再自动上传 Cloudflare 中控(失败不影响本地)。
  */
 class RideViewModel(app: Application) : AndroidViewModel(app) {
 
@@ -28,6 +29,8 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
     private val sensor = container.sensorManager
     private val location = container.locationTracker
     private val repository = container.rideRepository
+    private val cloudSync = container.cloudSyncRepository
+    private val settings = container.settings
 
     private val _state = MutableStateFlow(RideState())
     val state: StateFlow<RideState> = _state.asStateFlow()
@@ -122,6 +125,7 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
         val s = _state.value
         _state.value = s.copy(isRiding = false)
         if (s.durationSec < 3) return  // 忽略误触发
+        val pointsSnapshot = trackPoints.toList()
         viewModelScope.launch {
             val ride = RideEntity(
                 startedAt = startTime,
@@ -132,7 +136,16 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
                 maxSpeedKmh = s.maxSpeedKmh,
                 avgCadenceRpm = s.cadenceRpm,
             )
-            val id = repository.saveRide(ride, trackPoints.toList())
+            val id = repository.saveRide(ride, pointsSnapshot)
+            // 自动上传云端中控(未配置或失败均不影响本地)
+            runCatching {
+                cloudSync.upload(
+                    deviceId = settings.deviceId,
+                    rider = settings.riderName,
+                    ride = ride.copy(id = id),
+                    points = pointsSnapshot,
+                )
+            }
             onSaved(id)
         }
     }

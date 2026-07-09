@@ -8,6 +8,7 @@ import com.amap.api.location.AMapLocationClient
 import com.amap.api.maps.MapsInitializer
 import com.amap.api.services.core.ServiceSettings
 import com.honglian.smartcycling.core.Container
+import com.honglian.smartcycling.core.CrashHandler
 
 /**
  * 应用入口。持有全局依赖容器(轻量 DI),并创建前台服务通知渠道。
@@ -19,6 +20,8 @@ class SmartCyclingApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // 全局崩溃兜底:捕获未处理异常并落盘,下次启动展示
+        Thread.setDefaultUncaughtExceptionHandler(CrashHandler(this))
         initAmapPrivacy()
         container = Container(this)
         createRideChannel()

@@ -1,0 +1,16 @@
+# Cloudflare Workers 配置 —— 智慧骑行中控
+# 部署步骤见 README.md
+name = "smart-cycling-console"
+main = "src/index.js"
+compatibility_date = "2024-07-01"
+
+# D1 数据库绑定(创建后把 database_id 替换为真实值)
+[[d1_databases]]
+binding = "DB"
+database_name = "smart_cycling"
+database_id = "REPLACE_WITH_YOUR_D1_ID"
+
+# 访问令牌:App 上传与网页查看都用它做鉴权。
+# 生产环境建议改用 secret: wrangler secret put SYNC_TOKEN
+[vars]
+SYNC_TOKEN = "change-me-please"

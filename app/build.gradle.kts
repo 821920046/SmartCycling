@@ -16,9 +16,27 @@ android {
         versionName = "1.0.0"
         vectorDrawables { useSupportLibrary = true }
 
+        // 只保留真机常用架构:去掉模拟器专用的 x86/x86_64,大幅减小高德 native 库体积。
+        ndk {
+            abiFilters += "arm64-v8a"
+            abiFilters += "armeabi-v7a"
+        }
+
         // 高德地图 Key(通过 -PAMAP_KEY=xxx 或 gradle.properties 注入)
         manifestPlaceholders["AMAP_KEY"] =
             (project.findProperty("AMAP_KEY") as String? ?: "PUT_YOUR_AMAP_KEY_HERE")
+
+        // Cloudflare 中控地址与令牌(留空则 App 自动跳过云端上传)
+        buildConfigField(
+            "String",
+            "CLOUD_SYNC_URL",
+            "\"${project.findProperty("CLOUD_SYNC_URL") ?: ""}\"",
+        )
+        buildConfigField(
+            "String",
+            "CLOUD_SYNC_TOKEN",
+            "\"${project.findProperty("CLOUD_SYNC_TOKEN") ?: ""}\"",
+        )
     }
 
     signingConfigs {
@@ -37,6 +55,8 @@ android {
         }
         release {
             isMinifyEnabled = true
+            // 资源压缩:移除未引用资源,进一步缩小安装包。
+            isShrinkResources = true
             signingConfig = signingConfigs.getByName("shared")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -49,7 +69,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
-    buildFeatures { compose = true }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
     composeOptions { kotlinCompilerExtensionVersion = "1.5.14" }
     packaging { resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" } }
 }
@@ -59,6 +82,7 @@ dependencies {
     implementation(composeBom)
 
     implementation("androidx.core:core-ktx:1.13.1")
+    implementation("androidx.core:core-splashscreen:1.0.1")
     implementation("androidx.activity:activity-compose:1.9.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.4")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.4")

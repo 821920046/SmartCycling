@@ -2,7 +2,7 @@
   <img src="docs/logo.png" alt="智慧骑行 SmartCycling" width="200" />
 </p>
 
-<h1 align="center">智能骑行 SmartCycling</h1>
+<h1 align="center">智慧骑行 SmartCycling</h1>
 
 <p align="center">
   面向安卓的智能骑行 App · 自动配对传感器 · 高德地图导航 · 实时骑行数据
