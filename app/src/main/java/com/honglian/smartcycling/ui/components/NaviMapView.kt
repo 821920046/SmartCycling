@@ -3,6 +3,7 @@ package com.honglian.smartcycling.ui.components
 import android.os.Bundle
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -19,14 +20,13 @@ import com.amap.api.navi.SimpleNaviListener
 import com.amap.api.navi.enums.NaviType
 import com.amap.api.navi.model.AMapCalcRouteResult
 import com.amap.api.navi.model.NaviLatLng
-import com.honglian.smartcycling.navi.NaviTts
 
 /**
  * 完整 turn-by-turn 骑行导航视图(基于 AMapNaviView)。
  * - 自动展示转向箭头、车道信息、剩余距离/时间等导航 UI。
- * - 语音播报走系统 TTS,由 voiceEnabled 实时开关。
- * - 传入 startPoint(真实当前定位)作为算路起点,避免导航默认落到北京;
- *   若为空则退回不带起点算路(以 SDK 当前定位为起点)。经纬度骑行算路为免费接口。
+ * - 开启自动锁车(autoLockCar):相机始终跟随并居中当前车辆位置(街道级),不停在全览。
+ * - 语音使用高德内置语音播报(setUseInnerVoice),最稳定、无需系统 TTS 引擎;由 voiceEnabled 实时开关。
+ * - 传入 startPoint(真实当前定位)作为算路起点,避免导航默认落到北京。经纬度骑行算路为免费接口。
  */
 @Composable
 fun NaviMapView(
@@ -36,23 +36,28 @@ fun NaviMapView(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val appContext = context.applicationContext
     val lifecycleOwner = LocalLifecycleOwner.current
     val naviView = remember { AMapNaviView(context) }
-    val tts = remember { NaviTts(context) }
-    val voiceState = rememberUpdatedState(voiceEnabled)
+    val navi = remember { runCatching { AMapNavi.getInstance(appContext) }.getOrNull() }
     val destState = rememberUpdatedState(destination)
     val startState = rememberUpdatedState(startPoint)
 
     DisposableEffect(lifecycleOwner) {
         naviView.onCreate(Bundle())
-        val navi = runCatching { AMapNavi.getInstance(context.applicationContext) }.getOrNull()
+        // 自动锁车:相机始终跟随并居中当前车辆位置,不停留在全览模式
+        runCatching {
+            val options = naviView.viewOptions
+            options.setAutoLockCar(true)
+            naviView.viewOptions = options
+        }
         var attachedListener: SimpleNaviListener? = null
         if (navi != null) {
-            // 关闭内置语音但回调播报文本,交由系统 TTS 播报(便于开关)
-            navi.setUseInnerVoice(false, true)
-            val listener = NaviCallbacks(navi, destState, startState, voiceState, tts)
+            val listener = NaviCallbacks(navi, destState, startState)
             navi.addAMapNaviListener(listener)
             attachedListener = listener
+            // 默认开启内置语音播报
+            runCatching { navi.setUseInnerVoice(voiceEnabled, false) }
         }
 
         val observer = LifecycleEventObserver { _, event ->
@@ -73,8 +78,12 @@ fun NaviMapView(
             }
             naviView.onDestroy()
             runCatching { AMapNavi.destroy() }
-            tts.shutdown()
         }
+    }
+
+    // 语音开关:实时切换高德内置语音播报
+    LaunchedEffect(voiceEnabled, navi) {
+        runCatching { navi?.setUseInnerVoice(voiceEnabled, false) }
     }
 
     AndroidView(factory = { naviView }, modifier = modifier)
@@ -88,8 +97,6 @@ private class NaviCallbacks(
     private val navi: AMapNavi,
     private val destination: State<LatLng>,
     private val startPoint: State<LatLng?>,
-    private val voiceEnabled: State<Boolean>,
-    private val tts: NaviTts,
 ) : SimpleNaviListener() {
     override fun onInitNaviSuccess() {
         val d = destination.value
@@ -107,13 +114,5 @@ private class NaviCallbacks(
 
     override fun onCalculateRouteSuccess(routeResult: AMapCalcRouteResult?) {
         navi.startNavi(NaviType.GPS)
-    }
-
-    override fun onGetNavigationText(type: Int, text: String?) {
-        if (voiceEnabled.value && !text.isNullOrBlank()) tts.speak(text)
-    }
-
-    override fun onArriveDestination() {
-        if (voiceEnabled.value) tts.speak("您已到达目的地,本次骑行结束")
     }
 }
