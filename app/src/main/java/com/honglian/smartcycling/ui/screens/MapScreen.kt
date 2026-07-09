@@ -40,8 +40,9 @@ import com.honglian.smartcycling.ui.components.NavigationMapView
 
 /**
  * 地图主界面(两步式):
- * 1) 顶部搜索栏输入目的地 → 地图上预览路线 + 预计里程。
+ * 1) 顶部搜索栏输入目的地 → 地图上预览路线 + 终点标记 + 预计里程。
  * 2) 底部“开始骑行”→ 进入骑行数据界面。
+ * 初始无路线/目的地时,地图自动定位并居中到用户当前位置。
  */
 @Composable
 fun MapScreen(
@@ -51,15 +52,20 @@ fun MapScreen(
     onSearch: (String) -> Unit,
     onStartRide: () -> Unit,
     onSelectWheel: (WheelPreset) -> Unit,
+    destination: LatLng? = null,
     modifier: Modifier = Modifier,
 ) {
-    var destination by remember { mutableStateOf("") }
+    var query by remember { mutableStateOf("") }
     var showWheelDialog by remember { mutableStateOf(false) }
     val focus = LocalFocusManager.current
     val distanceKm = remember(routePoints) { routeDistanceKm(routePoints) }
 
     Box(modifier.fillMaxSize()) {
-        NavigationMapView(modifier = Modifier.fillMaxSize(), routePoints = routePoints)
+        NavigationMapView(
+            modifier = Modifier.fillMaxSize(),
+            routePoints = routePoints,
+            destination = destination,
+        )
 
         // 顶部搜索卡片(避开状态栏)
         Card(
@@ -72,16 +78,16 @@ fun MapScreen(
             Column(Modifier.padding(12.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(
-                        value = destination,
-                        onValueChange = { destination = it },
+                        value = query,
+                        onValueChange = { query = it },
                         label = { Text("输入目的地") },
                         singleLine = true,
                         modifier = Modifier.weight(1f),
                     )
                     Spacer(Modifier.width(8.dp))
                     Button(
-                        onClick = { focus.clearFocus(); onSearch(destination) },
-                        enabled = destination.isNotBlank(),
+                        onClick = { focus.clearFocus(); onSearch(query) },
+                        enabled = query.isNotBlank(),
                     ) { Text("搜索") }
                 }
                 Row(

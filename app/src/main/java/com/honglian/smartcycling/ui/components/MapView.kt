@@ -16,6 +16,7 @@ import com.amap.api.maps.CameraUpdateFactory
 import com.amap.api.maps.TextureMapView
 import com.amap.api.maps.model.LatLng
 import com.amap.api.maps.model.LatLngBounds
+import com.amap.api.maps.model.MarkerOptions
 import com.amap.api.maps.model.MyLocationStyle
 import com.amap.api.maps.model.PolylineOptions
 
@@ -23,15 +24,17 @@ import com.amap.api.maps.model.PolylineOptions
  * 高德地图视图(Compose 包装)。
  *
  * @param routePoints 传入时绘制骑行路线。
+ * @param destination 目的地;传入时在地图上标红色终点。
  * @param follow 骑行导航模式:地图实时跟随当前位置、放大到街道级;
- *   预览模式(false)则只显示蓝点并把整条路线自适应到视野。
+ *   预览模式(false)且无路线/目的地时自动定位并居中到当前位置。
  *
- * 防抖动:路线绘制只在 routePoints 变化时执行一次(LaunchedEffect),不放在每帧 update 块。
+ * 防抖动:路线/标记绘制只在 routePoints/destination 变化时执行(LaunchedEffect),不放在每帧 update 块。
  */
 @Composable
 fun NavigationMapView(
     modifier: Modifier = Modifier,
     routePoints: List<LatLng> = emptyList(),
+    destination: LatLng? = null,
     follow: Boolean = false,
     showMyLocation: Boolean = true,
 ) {
@@ -43,9 +46,12 @@ fun NavigationMapView(
         mapView.onCreate(Bundle())
         val aMap: AMap = mapView.map
         if (showMyLocation) {
-            val type =
-                if (follow) MyLocationStyle.LOCATION_TYPE_FOLLOW
-                else MyLocationStyle.LOCATION_TYPE_SHOW
+            val type = when {
+                follow -> MyLocationStyle.LOCATION_TYPE_FOLLOW
+                // 预览且尚无路线/目的地:定位并将镜头居中到当前位置
+                routePoints.isEmpty() && destination == null -> MyLocationStyle.LOCATION_TYPE_LOCATE
+                else -> MyLocationStyle.LOCATION_TYPE_SHOW
+            }
             aMap.myLocationStyle = MyLocationStyle().myLocationType(type).interval(1000)
             aMap.isMyLocationEnabled = true
         }
@@ -67,9 +73,11 @@ fun NavigationMapView(
         }
     }
 
-    LaunchedEffect(routePoints) {
+    LaunchedEffect(routePoints, destination) {
         val aMap = mapView.map ?: return@LaunchedEffect
         aMap.clear(true)
+        // 目的地红色标记
+        destination?.let { aMap.addMarker(MarkerOptions().position(it).title("目的地")) }
         if (routePoints.size >= 2) {
             aMap.addPolyline(
                 PolylineOptions()
@@ -77,12 +85,16 @@ fun NavigationMapView(
                     .width(20f)
                     .color(0xFF2563EB.toInt()),
             )
-            // 预览模式才自适应整条路线;导航模式交由定位跟随控制镜头。
+            // 预览模式才自适应整条路线(含目的地);导航模式交由定位跟随控制镜头。
             if (!follow) {
                 val builder = LatLngBounds.Builder()
                 routePoints.forEach { builder.include(it) }
+                destination?.let { builder.include(it) }
                 aMap.moveCamera(CameraUpdateFactory.newLatLngBounds(builder.build(), 120))
             }
+        } else if (destination != null && !follow) {
+            // 尚无路线时先把镜头对准目的地
+            aMap.moveCamera(CameraUpdateFactory.newLatLngZoom(destination, 15f))
         }
     }
 

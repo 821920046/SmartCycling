@@ -45,6 +45,7 @@ fun AppNav(
     val devices by pairingViewModel.devices.collectAsState()
     val routePoints by mapViewModel.route.collectAsState()
     val destination by mapViewModel.destination.collectAsState()
+    val startPoint by mapViewModel.startPoint.collectAsState()
     val mapStatus by mapViewModel.status.collectAsState()
     val currentWheel by settingsViewModel.wheel.collectAsState()
 
@@ -70,6 +71,7 @@ fun AppNav(
         composable(Routes.MAP) {
             MapScreen(
                 routePoints = routePoints,
+                destination = destination,
                 status = mapStatus,
                 currentWheel = currentWheel,
                 onSearch = { dest -> mapViewModel.planTo(dest) },
@@ -87,6 +89,7 @@ fun AppNav(
                 state = state,
                 routePoints = routePoints,
                 destination = destination,
+                startPoint = startPoint,
                 voiceEnabled = voiceEnabled,
                 onToggleVoice = { voiceEnabled = !voiceEnabled },
                 onStop = {

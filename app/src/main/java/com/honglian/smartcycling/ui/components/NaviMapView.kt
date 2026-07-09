@@ -25,12 +25,14 @@ import com.honglian.smartcycling.navi.NaviTts
  * 完整 turn-by-turn 骑行导航视图(基于 AMapNaviView)。
  * - 自动展示转向箭头、车道信息、剩余距离/时间等导航 UI。
  * - 语音播报走系统 TTS,由 voiceEnabled 实时开关。
- * - 不带起点算路(calculateRideRoute(to)),以当前定位为起点,经纬度骑行算路为免费接口。
+ * - 传入 startPoint(真实当前定位)作为算路起点,避免导航默认落到北京;
+ *   若为空则退回不带起点算路(以 SDK 当前定位为起点)。经纬度骑行算路为免费接口。
  */
 @Composable
 fun NaviMapView(
     destination: LatLng,
     voiceEnabled: Boolean,
+    startPoint: LatLng? = null,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -39,6 +41,7 @@ fun NaviMapView(
     val tts = remember { NaviTts(context) }
     val voiceState = rememberUpdatedState(voiceEnabled)
     val destState = rememberUpdatedState(destination)
+    val startState = rememberUpdatedState(startPoint)
 
     DisposableEffect(lifecycleOwner) {
         naviView.onCreate(Bundle())
@@ -47,7 +50,7 @@ fun NaviMapView(
         if (navi != null) {
             // 关闭内置语音但回调播报文本,交由系统 TTS 播报(便于开关)
             navi.setUseInnerVoice(false, true)
-            val listener = NaviCallbacks(navi, destState, voiceState, tts)
+            val listener = NaviCallbacks(navi, destState, startState, voiceState, tts)
             navi.addAMapNaviListener(listener)
             attachedListener = listener
         }
@@ -84,12 +87,22 @@ fun NaviMapView(
 private class NaviCallbacks(
     private val navi: AMapNavi,
     private val destination: State<LatLng>,
+    private val startPoint: State<LatLng?>,
     private val voiceEnabled: State<Boolean>,
     private val tts: NaviTts,
 ) : SimpleNaviListener() {
     override fun onInitNaviSuccess() {
         val d = destination.value
-        navi.calculateRideRoute(NaviLatLng(d.latitude, d.longitude))
+        val s = startPoint.value
+        if (s != null) {
+            // 带真实起点算路:导航从用户当前位置开始,而非默认北京
+            navi.calculateRideRoute(
+                NaviLatLng(s.latitude, s.longitude),
+                NaviLatLng(d.latitude, d.longitude),
+            )
+        } else {
+            navi.calculateRideRoute(NaviLatLng(d.latitude, d.longitude))
+        }
     }
 
     override fun onCalculateRouteSuccess(routeResult: AMapCalcRouteResult?) {

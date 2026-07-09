@@ -17,7 +17,7 @@ import com.honglian.smartcycling.ui.theme.DataLabel
 import com.honglian.smartcycling.ui.theme.DataValue
 import kotlin.math.roundToInt
 
-/** 2x2 数据网格:骑行时长 / 骑行路程 / 平均速度 / 踏频频率。 */
+/** 2x2 数据网格:骑行时长 / 骑行路程 / 平均速度 / 踏频频率。紧凑排版,保证仪表盘整屏可见。 */
 @Composable
 fun DataGrid(state: RideState, modifier: Modifier = Modifier) {
     Column(modifier.fillMaxWidth()) {
@@ -35,8 +35,8 @@ fun DataGrid(state: RideState, modifier: Modifier = Modifier) {
 
 @Composable
 private fun DataCell(modifier: Modifier, value: String, label: String) {
-    Column(modifier.padding(10.dp)) {
-        Text(value, fontSize = 21.sp, fontWeight = FontWeight.Bold, color = DataValue, fontFamily = FontFamily.Monospace)
-        Text(label, fontSize = 13.sp, color = DataLabel)
+    Column(modifier.padding(horizontal = 8.dp, vertical = 6.dp)) {
+        Text(value, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = DataValue, fontFamily = FontFamily.Monospace)
+        Text(label, fontSize = 11.sp, color = DataLabel)
     }
 }

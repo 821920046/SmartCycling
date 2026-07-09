@@ -11,8 +11,9 @@ import kotlinx.coroutines.launch
 
 /**
  * 地图/路线视图模型:输入目的地 → 定位→反查城市→POI解析→骑行路线规划。
- * route 用于预览绘线;destination 用于启动 turn-by-turn 导航。
- * 两者在 MapScreen 与 RideScreen 之间共享(同一 Activity 作用域)。
+ * route 用于预览绘线;destination 用于启动 turn-by-turn 导航;
+ * startPoint 为真实当前位置,作为导航算路起点(避免导航默认落到北京)。
+ * 三者在 MapScreen 与 RideScreen 之间共享(同一 Activity 作用域)。
  */
 class MapViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = AMapRouteRepository(app)
@@ -22,6 +23,9 @@ class MapViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _destination = MutableStateFlow<LatLng?>(null)
     val destination: StateFlow<LatLng?> = _destination.asStateFlow()
+
+    private val _startPoint = MutableStateFlow<LatLng?>(null)
+    val startPoint: StateFlow<LatLng?> = _startPoint.asStateFlow()
 
     private val _status = MutableStateFlow("")
     val status: StateFlow<String> = _status.asStateFlow()
@@ -35,6 +39,8 @@ class MapViewModel(app: Application) : AndroidViewModel(app) {
                 _status.value = "定位失败,请检查定位权限/GPS"
                 return@launch
             }
+            // 保存真实当前位置作为导航起点(避免导航默认落到北京)
+            _startPoint.value = LatLng(from.latitude, from.longitude)
             _status.value = "搜索目的地…"
             val city = runCatching { repo.cityOf(from) }.getOrDefault("")
             val to = repo.resolveDestination(destination, city)
