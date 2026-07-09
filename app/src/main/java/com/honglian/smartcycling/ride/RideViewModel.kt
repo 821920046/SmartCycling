@@ -50,11 +50,17 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
     private var lastGpsSpeed = 0.0
     private var sensorSpeed = 0.0
     private var cadence = 0.0
+    private var cadenceSum = 0.0
+    private var cadenceCount = 0L
+    private var sensorMode = SensorMode.SPEED
 
     fun startRide() {
         if (_state.value.isRiding) return
         startTime = System.currentTimeMillis()
         distanceMeters = 0.0
+        cadenceSum = 0.0
+        cadenceCount = 0L
+        sensorMode = SensorMode.SPEED
         trackPoints.clear()
         _state.value = RideState(isRiding = true)
 
@@ -68,8 +74,12 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun collectSensor() {
         sensor.readings.collect { r ->
             val now = System.currentTimeMillis()
-            r.speedKmh?.let { sensorSpeed = it; lastSensorSpeedAt = now }
-            r.cadenceRpm?.let { cadence = it; lastCadenceAt = now }
+            // 识别传感器模式:含轮转=速度模式;含曲柄=踏频模式(S314 二选一)
+            r.speedKmh?.let { sensorSpeed = it; lastSensorSpeedAt = now; sensorMode = SensorMode.SPEED }
+            r.cadenceRpm?.let {
+                cadence = it; lastCadenceAt = now; sensorMode = SensorMode.CADENCE
+                if (it > 0.0) { cadenceSum += it; cadenceCount++ }
+            }
             // 无 GPS 时用轮转圈数回退测距
             if (r.wheelDeltaRevs > 0 && !hasFreshGps()) {
                 distanceMeters += r.wheelDeltaRevs * sensor.wheelCircumferenceM
@@ -110,12 +120,15 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
                 else -> 0.0
             }
             val curCadence = if (now - lastCadenceAt < STALE_MS) cadence else 0.0
+            val avgCadence = if (cadenceCount > 0) cadenceSum / cadenceCount else 0.0
             val distKm = distanceMeters / 1000.0
             val avg = if (dur > 0) distKm / (dur / 3600.0) else 0.0
 
             _state.value = _state.value.copy(
                 speedKmh = speed,
                 cadenceRpm = curCadence,
+                avgCadenceRpm = avgCadence,
+                sensorMode = sensorMode,
                 distanceKm = distKm,
                 durationSec = dur,
                 avgSpeedKmh = avg,
@@ -140,7 +153,7 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
                 distanceKm = s.distanceKm,
                 avgSpeedKmh = s.avgSpeedKmh,
                 maxSpeedKmh = s.maxSpeedKmh,
-                avgCadenceRpm = s.cadenceRpm,
+                avgCadenceRpm = s.avgCadenceRpm,
             )
             val id = repository.saveRide(ride, pointsSnapshot)
             // 自动上传云端中控(未配置或失败均不影响本地)

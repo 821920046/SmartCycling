@@ -14,6 +14,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
+import kotlinx.coroutines.delay
 import androidx.lifecycle.LifecycleEventObserver
 import com.amap.api.maps.model.LatLng
 import com.amap.api.navi.AMapNavi
@@ -71,6 +72,9 @@ fun NaviMapView(
         }
         var attachedListener: SimpleNaviListener? = null
         if (navi != null) {
+            // 关键:必须在 startNavi 之前开启外部GPS模式,
+            // 否则导航已用内置定位启动、无法再切换 → 退回默认中心(北京)。
+            runCatching { navi.setIsUseExtraGPSData(true) }
             val listener = NaviCallbacks(navi, destState, startState)
             runCatching { navi.addAMapNaviListener(listener) }
             attachedListener = listener
@@ -98,22 +102,31 @@ fun NaviMapView(
         }
     }
 
-    // 第一性原理修复“地图停在北京”:高德内置定位在部分设备拿不到实时点,
-    // 改用我们自己可靠的 FusedLocation(WGS-84)→转高德坐标(GCJ-02)→喂给导航,
-    // 车标与镜头即跟随真实位置。setExtraGPSData 的 type=2 表示高德坐标。
-    LaunchedEffect(currentLatLng, navi) {
+    // 第一性原理修复“地图停在北京”:
+    // 根因——导航引擎拿不到定位点(左上角“信号弱”即证),车标退回默认中心(北京)。
+    // 对策——用我们自己可靠的定位持续喂给导航的外部GPS通道(1Hz):
+    //   • 实时点用 FusedLocation(WGS-84 → 转 GCJ-02);
+    //   • 实时点尚未到达时,先用算路起点 startPoint(已是高德坐标)兜底,
+    //     保证一开始镜头就落在广州而不是北京。
+    //   setExtraGPSData 的 type=2 表示传入的是高德坐标(GCJ-02)。
+    val liveState = rememberUpdatedState(currentLatLng)
+    LaunchedEffect(navi) {
         val n = navi ?: return@LaunchedEffect
-        val wgs = currentLatLng ?: return@LaunchedEffect
-        runCatching {
-            n.setIsUseExtraGPSData(true)
-            val gcj = toGcj02(context, wgs)
-            val loc = Location(LocationManager.GPS_PROVIDER).apply {
-                latitude = gcj.latitude
-                longitude = gcj.longitude
-                accuracy = 5f
-                time = System.currentTimeMillis()
+        while (true) {
+            val live = liveState.value
+            val gcj = if (live != null) toGcj02(context, live) else startState.value
+            if (gcj != null) {
+                runCatching {
+                    val loc = Location(LocationManager.GPS_PROVIDER).apply {
+                        latitude = gcj.latitude
+                        longitude = gcj.longitude
+                        accuracy = 5f
+                        time = System.currentTimeMillis()
+                    }
+                    n.setExtraGPSData(2, loc)
+                }
             }
-            n.setExtraGPSData(2, loc)
+            delay(1000)
         }
     }
 

@@ -19,30 +19,31 @@ import com.honglian.smartcycling.ui.theme.RingTrack
 import com.honglian.smartcycling.ui.theme.SpeedText
 import kotlin.math.roundToInt
 
-/** 环形速度表 + 中心大字。字号/线宽随直径自适应。 */
+/** 通用数值环(速度/踏频共用) + 中心大字。字号/线宽随直径自适应。 */
 @Composable
 fun SpeedRing(
-    speedKmh: Double,
+    value: Double,
     modifier: Modifier = Modifier,
-    maxKmh: Double = 60.0,
+    unit: String = "km/h",
+    maxValue: Double = 60.0,
     diameterDp: Int = 200,
 ) {
     Box(contentAlignment = Alignment.Center, modifier = modifier.size(diameterDp.dp)) {
         Canvas(Modifier.size(diameterDp.dp)) {
             val stroke = (diameterDp * 0.07f).dp.toPx()
             drawArc(RingTrack, 0f, 360f, false, style = Stroke(stroke, cap = StrokeCap.Round))
-            val fraction = (speedKmh / maxKmh).coerceIn(0.0, 1.0).toFloat()
+            val fraction = (value / maxValue).coerceIn(0.0, 1.0).toFloat()
             drawArc(RingBlue, -90f, fraction * 360f, false, style = Stroke(stroke, cap = StrokeCap.Round))
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = "${speedKmh.roundToInt()}",
+                text = "${value.roundToInt()}",
                 fontSize = (diameterDp / 3.4f).sp,
                 fontWeight = FontWeight.Bold,
                 color = SpeedText,
             )
             Text(
-                text = "km/h",
+                text = unit,
                 fontSize = (diameterDp / 10f).sp,
                 fontWeight = FontWeight.Bold,
                 color = DataLabel,

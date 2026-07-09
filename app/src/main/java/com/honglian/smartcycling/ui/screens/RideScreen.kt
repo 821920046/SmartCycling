@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.amap.api.maps.model.LatLng
 import com.honglian.smartcycling.ride.RideState
+import com.honglian.smartcycling.ride.SensorMode
 import com.honglian.smartcycling.ride.SpeedSource
 import com.honglian.smartcycling.ui.components.DataGrid
 import com.honglian.smartcycling.ui.components.NaviMapView
@@ -109,9 +110,19 @@ fun RideScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                SpeedRing(speedKmh = state.speedKmh, diameterDp = ring.value.toInt())
+                val cadenceMode = state.sensorMode == SensorMode.CADENCE
+                SpeedRing(
+                    value = if (cadenceMode) state.cadenceRpm else state.speedKmh,
+                    unit = if (cadenceMode) "rpm" else "km/h",
+                    maxValue = if (cadenceMode) 120.0 else 60.0,
+                    diameterDp = ring.value.toInt(),
+                )
                 Text(
-                    if (state.speedSource == SpeedSource.SENSOR_WHEEL) "速度来源 · 传感器" else "速度来源 · GPS",
+                    when {
+                        cadenceMode -> "踏频 · 实时 rpm"
+                        state.speedSource == SpeedSource.SENSOR_WHEEL -> "速度来源 · 传感器"
+                        else -> "速度来源 · GPS"
+                    },
                     fontSize = 11.sp,
                     color = DataLabel,
                 )
