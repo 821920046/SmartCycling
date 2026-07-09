@@ -66,19 +66,17 @@ fun NaviMapView(
         runCatching { naviView.onCreate(Bundle()) }
         // 夜间深色地图,与整体深色 HUD 保持一致
         runCatching { naviView.map.mapType = com.amap.api.maps.AMap.MAP_TYPE_NIGHT }
-        // 自动锁车:相机始终跟随并居中当前车辆位置,不停留在全览模式
+        // 自动锁车 + 隐藏原生导航控件层:
+        // • setAutoLockCar(true):相机始终跟随并居中当前车辆、车头朝上;
+        // • setLayoutVisible(false):隐藏所有原生 UI 控件(黑色转向面板/剩余距离时间/全览按钮/速度圈),
+        //   只保留地图“图面元素层”(路线、路面转向箭头、车标),得到干净的深色地图(即图二样式)。
+        // 转向提示仍通过语音播报 + 路面箭头呼现;速度在右侧仪表盘显示,无需左侧速度圈。
         runCatching {
             val options = naviView.viewOptions
             options.setAutoLockCar(true)
+            options.setLayoutVisible(false)
             naviView.viewOptions = options
         }
-        // 只把黑色转向面板等原生“控件盒子”的背景置为透明:
-        // 保留其中的转向箭头/距离/路名/速度圈等全部控件与文字,仅黑底变透明、透出地图。
-        // 用 OnGlobalLayoutListener 反复应用,确保面板在导航开始后被创建时也能生效。
-        val transparencyListener = android.view.ViewTreeObserver.OnGlobalLayoutListener {
-            runCatching { makeNaviPanelsTransparent(naviView) }
-        }
-        runCatching { naviView.viewTreeObserver.addOnGlobalLayoutListener(transparencyListener) }
         var attachedListener: SimpleNaviListener? = null
         if (navi != null) {
             // 关键:必须在 startNavi 之前开启外部GPS模式,
@@ -101,7 +99,6 @@ fun NaviMapView(
 
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
-            runCatching { naviView.viewTreeObserver.removeOnGlobalLayoutListener(transparencyListener) }
             val l = attachedListener
             if (navi != null && l != null) {
                 runCatching { navi.stopNavi() }
@@ -122,6 +119,7 @@ fun NaviMapView(
     val liveState = rememberUpdatedState(currentLatLng)
     LaunchedEffect(navi) {
         val n = navi ?: return@LaunchedEffect
+        var prev: Location? = null
         while (true) {
             val live = liveState.value
             val gcj = if (live != null) toGcj02(context, live) else startState.value
@@ -133,10 +131,22 @@ fun NaviMapView(
                         accuracy = 5f
                         time = System.currentTimeMillis()
                     }
+                    // 用相邻点推算航向与速度,让导航车标“车头朝向骑行方向”且跟随更跟手。
+                    prev?.let { p ->
+                        val d = p.distanceTo(loc)
+                        if (d >= 0.8f) {
+                            loc.bearing = p.bearingTo(loc)
+                            loc.speed = d / 0.8f  // 每 800ms 位移 → m/s
+                        } else {
+                            loc.bearing = p.bearing
+                            loc.speed = 0f
+                        }
+                    }
                     n.setExtraGPSData(2, loc)
+                    prev = loc
                 }
             }
-            delay(1000)
+            delay(800)
         }
     }
 
@@ -173,29 +183,5 @@ private class NaviCallbacks(
 
     override fun onCalculateRouteSuccess(routeResult: AMapCalcRouteResult?) {
         runCatching { navi.startNavi(NaviType.GPS) }
-    }
-}
-
-/**
- * 递归把 AMapNaviView 里所有“控件容器(ViewGroup)”的背景置为透明,
- * 让左侧黑色转向面板等原生面板的深色底透明化、透出地图;
- * 但不触碰地图渲染层(MapView/SurfaceView/TextureView),也不影响面板内的
- * 图标/文字/速度表(它们是叶子视图或自绘视图,清除背景不影响其内容)。
- */
-private fun makeNaviPanelsTransparent(view: android.view.View) {
-    val name = view.javaClass.name
-    // 跳过地图渲染层,避免影响地图显示
-    if (name.contains("MapView", ignoreCase = true) ||
-        name.contains("SurfaceView", ignoreCase = true) ||
-        name.contains("TextureView", ignoreCase = true) ||
-        name.contains("GLSurface", ignoreCase = true)
-    ) {
-        return
-    }
-    if (view is android.view.ViewGroup) {
-        runCatching { view.setBackgroundColor(android.graphics.Color.TRANSPARENT) }
-        for (i in 0 until view.childCount) {
-            makeNaviPanelsTransparent(view.getChildAt(i))
-        }
     }
 }

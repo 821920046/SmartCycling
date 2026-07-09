@@ -32,6 +32,7 @@ object Routes {
  */
 @Composable
 fun AppNav(
+    onPaired: () -> Unit,
     onEnterRide: () -> Unit,
     onExitRide: () -> Unit,
 ) {
@@ -62,6 +63,7 @@ fun AppNav(
             )
             LaunchedEffect(connection) {
                 if (connection == ConnectionState.READY) {
+                    onPaired()
                     navController.navigate(Routes.MAP) {
                         popUpTo(Routes.PAIRING) { inclusive = true }
                     }
@@ -96,6 +98,8 @@ fun AppNav(
                 onToggleVoice = { voiceEnabled = !voiceEnabled },
                 onStop = {
                     rideViewModel.stopRide()
+                    // 清空上一次路线/目的地,回到地图即为干净可输入状态(便于中途换目的地)
+                    mapViewModel.reset()
                     onExitRide()
                     navController.navigate(Routes.MAP) {
                         popUpTo(Routes.RIDE) { inclusive = true }

@@ -45,12 +45,16 @@ class MainActivity : ComponentActivity() {
             SmartCyclingTheme {
                 var crash by remember { mutableStateOf(crashLog) }
                 AppNav(
+                    onPaired = {
+                        // 配对完成进入地图即锁定横屏,方便横屏输入目的地与导航
+                        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                    },
                     onEnterRide = {
                         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
                         startRideService()
                     },
                     onExitRide = {
-                        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                        // 退出骑行回到地图,保持横屏(方便继续换目的地),仅停止前台服务
                         stopRideService()
                     },
                 )

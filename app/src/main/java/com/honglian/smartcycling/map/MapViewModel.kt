@@ -30,6 +30,13 @@ class MapViewModel(app: Application) : AndroidViewModel(app) {
     private val _status = MutableStateFlow("")
     val status: StateFlow<String> = _status.asStateFlow()
 
+    /** 退出骑行后清空上一次的路线/目的地,回到干净的可输入状态(保留起点定位缓存)。 */
+    fun reset() {
+        _route.value = emptyList()
+        _destination.value = null
+        _status.value = ""
+    }
+
     fun planTo(destination: String) {
         if (destination.isBlank()) return
         viewModelScope.launch {
