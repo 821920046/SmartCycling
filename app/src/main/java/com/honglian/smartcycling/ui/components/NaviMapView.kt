@@ -66,18 +66,22 @@ fun NaviMapView(
         runCatching { naviView.onCreate(Bundle()) }
         // 夜间深色地图,与整体深色 HUD 保持一致
         runCatching { naviView.map.mapType = com.amap.api.maps.AMap.MAP_TYPE_NIGHT }
-        // 自动锁车 + 保持原生导航控件可见。
-        // 修复:此前 setLayoutVisible(false) 会把整个导航视图连同地图一起隐藏,
-        // 导致左侧导航界面空白/黑屏且无法退出。
-        // • setAutoLockCar(true):相机始终跟随并居中当前车辆、车头朝上;
-        // • setLayoutVisible(true):保留原生导航 UI(转向面板、路面箭头、剩余距离时间),
-        //   确保“导航界面”一定可见、可退出。深色地图由 MAP_TYPE_NIGHT 提供,与整体 HUD 协调。
+        // 自动锁车 + 保留底图,但隐藏所有原生导航 UI 覆盖层(黑色转向面板/剩余距离时间/全览退出/速度圈)。
+        // 做法:setLayoutVisible(true) 让底图正常渲染(setLayoutVisible(false) 会把底图也一起隐藏),
+        // 再通过“隐藏所有不含地图的兄弟视图分支”把原生覆盖 UI 全部 GONE 掉,
+        // 只留下干净的深色底图 + 蓝色路线 + 车标(即百度那种清爽导航样式)。
+        // 转向提示仍由内置语音播报;速度/数据在右侧仪表盘显示。
         runCatching {
             val options = naviView.viewOptions
             options.setAutoLockCar(true)
             options.setLayoutVisible(true)
             naviView.viewOptions = options
         }
+        // 首次布局后隐藏原生覆盖层,并在 SDK 因导航事件重新显示时持续隐藏。
+        val hideOverlays = android.view.ViewTreeObserver.OnGlobalLayoutListener {
+            runCatching { hideNativeNaviOverlays(naviView) }
+        }
+        runCatching { naviView.viewTreeObserver.addOnGlobalLayoutListener(hideOverlays) }
         var attachedListener: SimpleNaviListener? = null
         if (navi != null) {
             // 关键:必须在 startNavi 之前开启外部GPS模式,
@@ -100,6 +104,7 @@ fun NaviMapView(
 
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
+            runCatching { naviView.viewTreeObserver.removeOnGlobalLayoutListener(hideOverlays) }
             val l = attachedListener
             if (navi != null && l != null) {
                 runCatching { navi.stopNavi() }
@@ -184,5 +189,35 @@ private class NaviCallbacks(
 
     override fun onCalculateRouteSuccess(routeResult: AMapCalcRouteResult?) {
         runCatching { navi.startNavi(NaviType.GPS) }
+    }
+}
+
+/** 判断某视图子树中是否包含地图渲染面(用于在隐藏原生覆盖层时保留底图)。 */
+private fun viewContainsMapSurface(v: android.view.View): Boolean {
+    if (v is android.view.SurfaceView || v is android.view.TextureView || v is android.opengl.GLSurfaceView) return true
+    val cn = v.javaClass.name
+    if (cn.contains("MapView", true) || cn.contains("GLMapView", true) || cn.contains("TextureMapView", true)) return true
+    if (v is android.view.ViewGroup) {
+        for (i in 0 until v.childCount) {
+            if (viewContainsMapSurface(v.getChildAt(i))) return true
+        }
+    }
+    return false
+}
+
+/**
+ * 隐藏 AMapNaviView 的所有原生 UI 覆盖层,仅保留底图分支。
+ * 递归:只深入“包含地图”的分支去隐藏其覆盖兄弟;凡是“不含地图”的分支整体 GONE。
+ * 与具体控件层级无关,稳健地移除黑色转向面板、剩余距离时间、全览/退出、速度圈等。
+ */
+private fun hideNativeNaviOverlays(v: android.view.View) {
+    if (v !is android.view.ViewGroup) return
+    for (i in 0 until v.childCount) {
+        val c = v.getChildAt(i)
+        if (viewContainsMapSurface(c)) {
+            hideNativeNaviOverlays(c)
+        } else if (c.visibility != android.view.View.GONE) {
+            c.visibility = android.view.View.GONE
+        }
     }
 }
