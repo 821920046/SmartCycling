@@ -43,6 +43,7 @@ fun NavigationMapView(
     showMyLocation: Boolean = true,
     /** 传入真实定位(WGS-84)时,用它驱动镜头跟随与“我的位置”标记,不依赖高德内置定位。 */
     followLocation: LatLng? = null,
+    mapType: Int = 3,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -51,8 +52,6 @@ fun NavigationMapView(
     DisposableEffect(lifecycleOwner) {
         mapView.onCreate(Bundle())
         val aMap: AMap = mapView.map
-        // 夜间深色地图样式,与整体深色 HUD 保持一致
-        runCatching { aMap.mapType = AMap.MAP_TYPE_NIGHT }
         // 提供外部定位(followLocation)时不启用高德内置定位图层,改由外部定位驱动。
         if (showMyLocation && followLocation == null) {
             val type = when {
@@ -81,6 +80,19 @@ fun NavigationMapView(
             mapView.onDestroy()
         }
     }
+
+    // 动态监听地图样式变化
+    LaunchedEffect(mapType) {
+        val aMap = mapView.map ?: return@LaunchedEffect
+        runCatching {
+            aMap.mapType = when (mapType) {
+                1 -> AMap.MAP_TYPE_NORMAL
+                2 -> AMap.MAP_TYPE_SATELLITE
+                else -> AMap.MAP_TYPE_NIGHT
+            }
+        }
+    }
+
 
     LaunchedEffect(routePoints, destination) {
         val aMap = mapView.map ?: return@LaunchedEffect

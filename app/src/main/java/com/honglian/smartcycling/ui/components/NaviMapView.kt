@@ -39,6 +39,7 @@ fun NaviMapView(
     startPoint: LatLng? = null,
     currentLatLng: LatLng? = null,
     modifier: Modifier = Modifier,
+    mapType: Int = 3,
 ) {
     val context = LocalContext.current
     val appContext = context.applicationContext
@@ -58,19 +59,19 @@ fun NaviMapView(
             destination = destination,
             follow = true,
             followLocation = currentLatLng,
+            mapType = mapType,
         )
         return
     }
 
     DisposableEffect(lifecycleOwner) {
         runCatching { naviView.onCreate(Bundle()) }
-        // 夜间深色地图,与整体深色 HUD 保持一致
-        runCatching { naviView.map.mapType = com.amap.api.maps.AMap.MAP_TYPE_NIGHT }
         // 自动锁车 + 保留底图,但隐藏所有原生导航 UI 覆盖层(黑色转向面板/剩余距离时间/全览退出/速度圈)。
         // 做法:setLayoutVisible(true) 让底图正常渲染(setLayoutVisible(false) 会把底图也一起隐藏),
         // 再通过“隐藏所有不含地图的兄弟视图分支”把原生覆盖 UI 全部 GONE 掉,
         // 只留下干净的深色底图 + 蓝色路线 + 车标(即百度那种清爽导航样式)。
         // 转向提示仍由内置语音播报;速度/数据在右侧仪表盘显示。
+
         runCatching {
             val options = naviView.viewOptions
             options.setAutoLockCar(true)
@@ -161,8 +162,21 @@ fun NaviMapView(
         runCatching { navi?.setUseInnerVoice(voiceEnabled, false) }
     }
 
+    // 动态监听地图样式变化
+    LaunchedEffect(mapType) {
+        val aMap = naviView.map ?: return@LaunchedEffect
+        runCatching {
+            aMap.mapType = when (mapType) {
+                1 -> com.amap.api.maps.AMap.MAP_TYPE_NORMAL
+                2 -> com.amap.api.maps.AMap.MAP_TYPE_SATELLITE
+                else -> com.amap.api.maps.AMap.MAP_TYPE_NIGHT
+            }
+        }
+    }
+
     AndroidView(factory = { naviView }, modifier = modifier)
 }
+
 
 /**
  * 导航回调(继承官方空实现适配器 SimpleNaviListener,仅重写所需方法)。

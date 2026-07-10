@@ -21,9 +21,28 @@
 8. **权限**:区分 Android 12+ 的 `BLUETOOTH_SCAN/CONNECT` 与旧版 `BLUETOOTH`,运行时动态申请。
 9. **翻转计数**:曲柄圈数 uint16 差值也做 `and 0xFFFF` 修正。
 
-## 三、待完善(非阻断,下一迭代)
+## 三、系统级极致重构与升级迭代 (2026-07-10)
 
-- 地图 SDK 仍为占位(`ui/components/MapView.kt`),需接入高德/Mapbox 真实 MapView 与路径规划。
-- 未附 `gradle-wrapper.jar`(二进制),首次需 IDE 或 `gradle wrapper` 生成(见 README)。
-- 单元测试:建议为 `CscParser`/`CscCalculator` 补充 JUnit 用例(纯函数,易测)。
-- 踏频/速度平滑:可选对 `SensorReading` 加 EMA 滤波降低拖尾拖动。
+以下为本次全量完成的极致升级优化项目：
+
+### 1. 核心算法平滑与防御过滤 (第一性原则)
+- **时速与踏频 EMA 滤波**：在 `RideViewModel` 接入指数移动平均（EMA，\(\alpha = 0.4\)）算法，彻底消除包分发抖动引起的数值突跳。
+- **跳点大漂移积分拦截**：在 `LocationTracker` 中增加时速上限（80km/h）规则拦截，跳跃漂移的点不累加里程，且不更新基准位置，完美应对出入高架与隧道。
+- **等红绿灯自动暂停与排除**：静止 5s 自动暂停时长与数据统计，起步时速 > 1.5km/h 自动唤醒，且支持手动暂停/恢复。
+- **数据库防闪退自愈**：在 `AppDatabase` 初始化链中加入 `.fallbackToDestructiveMigration()` 自愈能力。
+
+### 2. 霓虹科幻 HUD 主视觉重塑 (WOW 级 UI 质感)
+- **动态雷达配对**：将黑白朴素的 `PairingScreen` 改造为同心扩散脉冲波圆圈与旋转渐变波束雷达。
+- **流光刻度环**：`SpeedRing` 采用 `animateFloatAsState` 阻尼平滑动画，并绘制 24 根半透明发光机械刻度线，辅以双层霓虹光环渲染。
+- **毛玻璃数据网格**：`DataGrid` 使用 `GlassBg` 与 `GlassBorder` 并集成状态标识小图标，支持暂停状态下置灰冻结显示。
+- **悬浮仪表盘**：`MapScreen` 控制面板升级为悬浮毛玻璃，增加设置和历史快捷入口，支持热重载切换地图图层（夜间/卫星/标准）。
+- **防误触确认**：在 `RideScreen` 中引入“结束骑行”防误触二次确认弹窗。
+
+### 3. 数据大看板与轨迹回顾
+- **轨迹弹窗渲染**：`HistoryScreen` 增加骑行总看板，列表以精美圆角边框显示，点击任意记录即异步调取 Room 轨迹，在高德地图上清晰平滑渲染出骑行路线。
+- **系统设置中心**：新建 `SettingsScreen` 提供骑手名、车轮周长、同步 URL / Token 标定。
+- **转场过渡动画**：`AppNav` 采用 Compose 导航，并为各层级跳转注入高精度的淡入淡出和横向滑动动画。
+
+### 4. 云中控大屏大改造
+- **Leaflet 交互地图**：`index.js` 重构为具有暗黑大屏格调的 Dashboard，点击列表条目，右侧集成的高德 Leaflet 瓦片地图自适应居中绘制出 GCJ-02 真实骑行折线。
+

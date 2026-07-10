@@ -44,18 +44,41 @@ class LocationTracker(private val context: Context) {
             override fun onLocationResult(result: LocationResult) {
                 val loc = result.lastLocation ?: return
                 val prev = lastLocation
-                // 过滤低精度定位(>25m 误差不参与积分)
-                val delta = if (prev != null && loc.accuracy <= 25f) {
+                
+                var delta = 0.0
+                var isJumpPoint = false
+
+                if (prev != null && loc.accuracy <= 25f) {
                     val d = prev.distanceTo(loc).toDouble()
-                    if (d < 1.0) 0.0 else d  // 静止漂移阀值 1m
-                } else 0.0
-                lastLocation = loc
+                    val dt = (loc.time - prev.time) / 1000.0
+                    
+                    if (dt > 0.0) {
+                        val calcSpeedKmh = (d / dt) * 3.6
+                        if (calcSpeedKmh > 80.0) {
+                            // 时速超过 80km/h，极有可能是隧道/高架导致的跳点漂移，标记为跳点
+                            isJumpPoint = true
+                        }
+                    }
+                    
+                    if (!isJumpPoint) {
+                        delta = if (d < 1.0) 0.0 else d // 静止漂移阈值 1m
+                    }
+                }
+
+                // 如果是跳点，不更新 lastLocation，防止持续受影响
+                if (!isJumpPoint) {
+                    lastLocation = loc
+                }
+
                 val speedKmh = if (loc.hasSpeed()) loc.speed * 3.6 else 0.0
+                // 同样，如果自身上报速度异常，或者计算异常，可以限制最大速度表现
+                val finalSpeedKmh = if (speedKmh > 80.0) 0.0 else speedKmh
+
                 trySend(
                     LocationSample(
                         latitude = loc.latitude,
                         longitude = loc.longitude,
-                        speedKmh = speedKmh,
+                        speedKmh = finalSpeedKmh,
                         deltaMeters = delta,
                         timestampMs = System.currentTimeMillis(),
                     ),
@@ -64,5 +87,6 @@ class LocationTracker(private val context: Context) {
         }
         client.requestLocationUpdates(request, callback, Looper.getMainLooper())
         awaitClose { client.removeLocationUpdates(callback) }
+
     }
 }

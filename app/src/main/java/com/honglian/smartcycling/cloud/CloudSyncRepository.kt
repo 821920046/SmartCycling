@@ -25,8 +25,10 @@ class CloudSyncRepository {
         rider: String,
         ride: RideEntity,
         points: List<TrackPointEntity>,
+        customUrl: String = "",
+        customToken: String = "",
     ): Result<Unit> = withContext(Dispatchers.IO) {
-        val base = BuildConfig.CLOUD_SYNC_URL.trim().trimEnd('/')
+        val base = (if (customUrl.isNotBlank()) customUrl else BuildConfig.CLOUD_SYNC_URL).trim().trimEnd('/')
         if (base.isBlank()) return@withContext Result.success(Unit)
 
         runCatching {
@@ -61,8 +63,9 @@ class CloudSyncRepository {
                 readTimeout = 15000
                 doOutput = true
                 setRequestProperty("Content-Type", "application/json; charset=utf-8")
-                if (BuildConfig.CLOUD_SYNC_TOKEN.isNotBlank()) {
-                    setRequestProperty("Authorization", "Bearer ${BuildConfig.CLOUD_SYNC_TOKEN}")
+                val activeToken = if (customToken.isNotBlank()) customToken else BuildConfig.CLOUD_SYNC_TOKEN
+                if (activeToken.isNotBlank()) {
+                    setRequestProperty("Authorization", "Bearer $activeToken")
                 }
             }
             conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
@@ -73,3 +76,4 @@ class CloudSyncRepository {
         }
     }
 }
+

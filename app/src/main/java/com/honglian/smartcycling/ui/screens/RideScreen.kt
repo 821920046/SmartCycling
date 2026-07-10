@@ -54,15 +54,20 @@ import kotlin.math.min
 @Composable
 fun RideScreen(
     state: RideState,
+
     routePoints: List<LatLng> = emptyList(),
     destination: LatLng? = null,
     startPoint: LatLng? = null,
     currentLatLng: LatLng? = null,
     voiceEnabled: Boolean = true,
     onToggleVoice: () -> Unit = {},
+    onTogglePause: () -> Unit = {},
     onStop: () -> Unit,
+    mapType: Int = 3,
     modifier: Modifier = Modifier,
 ) {
+    var showStopConfirm by remember { mutableStateOf(false) }
+
     Row(modifier.fillMaxSize().background(PanelBg)) {
         // 左:导航
         Box(Modifier.weight(1.3f).fillMaxHeight()) {
@@ -72,6 +77,7 @@ fun RideScreen(
                     voiceEnabled = voiceEnabled,
                     startPoint = startPoint,
                     currentLatLng = currentLatLng,
+                    mapType = mapType,
                     modifier = Modifier.fillMaxSize(),
                 )
                 Surface(
@@ -97,6 +103,7 @@ fun RideScreen(
                     routePoints = routePoints,
                     follow = true,
                     followLocation = currentLatLng,
+                    mapType = mapType,
                 )
             }
         }
@@ -105,57 +112,123 @@ fun RideScreen(
         // 右:数据仪表盘(按屏幕高度自适应,保证不滚动即可整屏显示)
         BoxWithConstraints(
             Modifier
-                .weight(1f)
+                .weight(1.5f) // 加宽右边大面板以容纳双按钮和精致布局
                 .fillMaxHeight()
                 .background(Brush.verticalGradient(listOf(PanelBgTop, PanelBgBottom)))
                 .safeDrawingPadding(),
         ) {
-            // 预留"标签+数据卡+结束按钮+间距"所需高度,其余高度给速度环;并按面板宽度上限收敛
-            val maxRing = min(maxWidth.value * 0.88f, 224f).coerceAtLeast(96f)
-            val ring = (maxHeight - 188.dp).coerceIn(96.dp, maxRing.dp)
-            Column(
-                Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                val cadenceMode = state.sensorMode == SensorMode.CADENCE
-                SpeedRing(
-                    value = if (cadenceMode) state.cadenceRpm else state.speedKmh,
-                    unit = if (cadenceMode) "rpm" else "km/h",
-                    maxValue = if (cadenceMode) 120.0 else 60.0,
-                    diameterDp = ring.value.toInt(),
-                )
-                Text(
-                    when {
-                        cadenceMode -> "踏频 · 实时 rpm"
-                        state.speedSource == SpeedSource.SENSOR_WHEEL -> "速度来源 · 传感器"
-                        else -> "速度来源 · GPS"
-                    },
-                    fontSize = 11.sp,
-                    color = DataLabel,
-                )
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = CardDefaults.cardColors(containerColor = CardBg),
+            val maxRing = min(maxWidth.value * 0.82f, 200f).coerceAtLeast(80f)
+            val ring = (maxHeight - 190.dp).coerceIn(80.dp, maxRing.dp)
+            
+            Box(Modifier.fillMaxSize()) {
+                Column(
+                    Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    DataGrid(state, Modifier.padding(vertical = 2.dp))
-                }
-                Spacer(Modifier.weight(1f))
-                Surface(
-                    onClick = onStop,
-                    shape = RoundedCornerShape(12.dp),
-                    color = StopRed,
-                    contentColor = Color.White,
-                    modifier = Modifier.fillMaxWidth().height(46.dp).zIndex(2f),
-                ) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("结束骑行", fontSize = 16.sp)
+                    val cadenceMode = state.sensorMode == SensorMode.CADENCE
+                    SpeedRing(
+                        value = if (cadenceMode) state.cadenceRpm else state.speedKmh,
+                        unit = if (cadenceMode) "rpm" else "km/h",
+                        maxValue = if (cadenceMode) 120.0 else 60.0,
+                        diameterDp = ring.value.toInt(),
+                    )
+                    Text(
+                        when {
+                            state.isPaused -> "⏱ 自动暂停中"
+                            cadenceMode -> "踏频 · 实时 rpm"
+                            state.speedSource == SpeedSource.SENSOR_WHEEL -> "速度来源 · 传感器"
+                            else -> "速度来源 · GPS"
+                        },
+                        fontSize = 11.sp,
+                        color = if (state.isPaused) PauseOrange else DataLabel,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Card(
+                        modifier = Modifier.fillMaxWidth().border(1.dp, GlassBorder, RoundedCornerShape(14.dp)),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = GlassBg),
+                    ) {
+                        DataGrid(state, Modifier.padding(vertical = 4.dp))
                     }
+                    Spacer(Modifier.weight(1f))
+                    
+                    // 双重操作控制按钮组合
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Surface(
+                            onClick = onTogglePause,
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (state.isPaused) BrandCyan else PauseOrange,
+                            contentColor = Color(0xFF060913),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(46.dp)
+                                .zIndex(2f),
+                        ) {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Text(
+                                    if (state.isPaused) "▶ 恢复" else "⏸ 暂停",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                        
+                        Surface(
+                            onClick = { showStopConfirm = true },
+                            shape = RoundedCornerShape(12.dp),
+                            color = StopRed,
+                            contentColor = Color.White,
+                            modifier = Modifier
+                                .weight(1.3f)
+                                .height(46.dp)
+                                .zIndex(2f),
+                        ) {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Text("结束骑行", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+
+                // 自动暂停时的半透明磨砂遮罩罩在数据区
+                if (state.isPaused) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color(0x33000000))
+                            .clickable(onClick = onTogglePause)
+                    )
                 }
             }
         }
     }
+
+    // 误触确认对话框
+    if (showStopConfirm) {
+        AlertDialog(
+            onDismissRequest = { showStopConfirm = false },
+            containerColor = CardBg,
+            titleContentColor = SpeedText,
+            textContentColor = DataLabel,
+            title = { Text("确认结束本次骑行？", fontWeight = FontWeight.Bold) },
+            text = { Text("本次骑行的轨迹与传感器数据将被封盘存入数据库并同步至云端。") },
+            confirmButton = {
+                TextButton(onClick = { showStopConfirm = false; onStop() }) {
+                    Text("确认结束", color = StopRed, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showStopConfirm = false }) {
+                    Text("继续骑行", color = BrandCyan)
+                }
+            }
+        )
+    }
 }
+

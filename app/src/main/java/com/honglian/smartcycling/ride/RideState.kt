@@ -18,7 +18,9 @@ data class RideState(
     val maxSpeedKmh: Double = 0.0,
     val speedSource: SpeedSource = SpeedSource.GPS,
     val isRiding: Boolean = false,
+    val isPaused: Boolean = false,
 ) {
     val durationText: String
         get() = "%02d:%02d:%02d".format(durationSec / 3600, (durationSec % 3600) / 60, durationSec % 60)
 }
+
