@@ -1,4 +1,4 @@
-// 智慧骑行 中控 Worker
+// 智能骑行 中控 Worker
 // 路由:
 //   GET  /                → 中控网页(表格查看骑行记录)
 //   POST /api/rides       → App 上传一次骑行(含轨迹点),需 Bearer 令牌
@@ -113,7 +113,7 @@ const DASHBOARD_HTML = `<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>智慧骑行 · 中控</title>
+<title>智能骑行 · 中控</title>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
@@ -135,7 +135,7 @@ const DASHBOARD_HTML = `<!doctype html>
 </head>
 <body>
 <header>
-  <h1>🚴 智慧骑行 · 中控</h1>
+  <h1>🚴 智能骑行 · 中控</h1>
   <div class="sp"></div>
   <input id="tok" placeholder="访问令牌 SYNC_TOKEN">
   <button id="save">保存并刷新</button>

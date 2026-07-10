@@ -1,4 +1,4 @@
-# 智慧骑行 · Cloudflare 中控
+# 智能骑行 · Cloudflare 中控
 
 骑行结束后,App 会自动把本次骑行(汇总数据 + 轨迹点)POST 到这个 Cloudflare Worker,并写入 D1 数据库;打开 Worker 首页即可在网页表格里查看所有记录。
 

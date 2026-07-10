@@ -1,4 +1,4 @@
-# Cloudflare Workers 配置 —— 智慧骑行中控
+# Cloudflare Workers 配置 —— 智能骑行中控
 # 部署步骤见 README.md
 name = "smart-cycling-console"
 main = "src/index.js"

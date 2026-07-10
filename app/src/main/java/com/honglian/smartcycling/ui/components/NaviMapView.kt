@@ -66,15 +66,16 @@ fun NaviMapView(
         runCatching { naviView.onCreate(Bundle()) }
         // 夜间深色地图,与整体深色 HUD 保持一致
         runCatching { naviView.map.mapType = com.amap.api.maps.AMap.MAP_TYPE_NIGHT }
-        // 自动锁车 + 隐藏原生导航控件层:
+        // 自动锁车 + 保持原生导航控件可见。
+        // 修复:此前 setLayoutVisible(false) 会把整个导航视图连同地图一起隐藏,
+        // 导致左侧导航界面空白/黑屏且无法退出。
         // • setAutoLockCar(true):相机始终跟随并居中当前车辆、车头朝上;
-        // • setLayoutVisible(false):隐藏所有原生 UI 控件(黑色转向面板/剩余距离时间/全览按钮/速度圈),
-        //   只保留地图“图面元素层”(路线、路面转向箭头、车标),得到干净的深色地图(即图二样式)。
-        // 转向提示仍通过语音播报 + 路面箭头呼现;速度在右侧仪表盘显示,无需左侧速度圈。
+        // • setLayoutVisible(true):保留原生导航 UI(转向面板、路面箭头、剩余距离时间),
+        //   确保“导航界面”一定可见、可退出。深色地图由 MAP_TYPE_NIGHT 提供,与整体 HUD 协调。
         runCatching {
             val options = naviView.viewOptions
             options.setAutoLockCar(true)
-            options.setLayoutVisible(false)
+            options.setLayoutVisible(true)
             naviView.viewOptions = options
         }
         var attachedListener: SimpleNaviListener? = null

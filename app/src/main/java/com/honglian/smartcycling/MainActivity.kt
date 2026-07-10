@@ -66,8 +66,11 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun startRideService() {
-        val intent = Intent(this, RideService::class.java)
-        ContextCompat.startForegroundService(this, intent)
+        // 包一层兑底:即使启动前台服务抛异常,也不影响进入骑行界面。
+        runCatching {
+            val intent = Intent(this, RideService::class.java)
+            ContextCompat.startForegroundService(this, intent)
+        }
     }
 
     private fun stopRideService() {

@@ -1,4 +1,4 @@
--- 智慧骑行中控 D1 数据库结构
+-- 智能骑行中控 D1 数据库结构
 -- 初始化: wrangler d1 execute smart_cycling --file=./schema.sql --remote
 
 CREATE TABLE IF NOT EXISTS rides (
