@@ -47,7 +47,7 @@ fun SpeedRing(
 
     Box(contentAlignment = Alignment.Center, modifier = modifier.size(diameterDp.dp)) {
         Canvas(Modifier.size(diameterDp.dp)) {
-            val center = size / 2.0f
+            val centerOffset = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)
             val strokeWidth = (diameterDp * 0.06f).dp.toPx()
             val radius = (size.minDimension - strokeWidth) / 2.0f
 
@@ -60,8 +60,8 @@ fun SpeedRing(
                 rotate(angle) {
                     drawLine(
                         color = Color(0x2600F0FF), // 弱发光青
-                        start = androidx.compose.ui.geometry.Offset(center.x, strokeWidth * 0.5f),
-                        end = androidx.compose.ui.geometry.Offset(center.x, strokeWidth * 0.5f + tickLength),
+                        start = androidx.compose.ui.geometry.Offset(centerOffset.x, strokeWidth * 0.5f),
+                        end = androidx.compose.ui.geometry.Offset(centerOffset.x, strokeWidth * 0.5f + tickLength),
                         strokeWidth = tickStroke
                     )
                 }
@@ -81,7 +81,7 @@ fun SpeedRing(
             if (sweepAngle > 0f) {
                 val brush = Brush.sweepGradient(
                     colors = listOf(BrandCyan, BrandGreen, BrandCyan),
-                    center = center
+                    center = centerOffset
                 )
 
                 // 3. 绘制底层发光霓虹晕 (较粗，半透明)

@@ -164,7 +164,7 @@ fun NaviMapView(
 
     // 动态监听地图样式变化
     LaunchedEffect(mapType) {
-        val aMap = naviView.map ?: return@LaunchedEffect
+        val aMap = naviView?.map ?: return@LaunchedEffect
         runCatching {
             aMap.mapType = when (mapType) {
                 1 -> com.amap.api.maps.AMap.MAP_TYPE_NORMAL
@@ -174,7 +174,7 @@ fun NaviMapView(
         }
     }
 
-    AndroidView(factory = { naviView }, modifier = modifier)
+    AndroidView(factory = { naviView!! }, modifier = modifier)
 }
 
 
