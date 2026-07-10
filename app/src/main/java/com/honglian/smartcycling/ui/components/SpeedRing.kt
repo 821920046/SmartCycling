@@ -75,7 +75,7 @@ fun SpeedRing(
             )
 
             // 计算进度比例
-            val fraction = (animatedValue / maxValue).coerceIn(0.0f, 1.0f)
+            val fraction = (animatedValue / maxValue).coerceIn(0.0, 1.0).toFloat()
             val sweepAngle = fraction * 360f
 
             if (sweepAngle > 0f) {
