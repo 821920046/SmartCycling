@@ -8,7 +8,7 @@ compatibility_date = "2024-07-01"
 [[d1_databases]]
 binding = "DB"
 database_name = "smart_cycling"
-database_id = "REPLACE_WITH_YOUR_D1_ID"
+database_id = "e7e02ff0-3db7-43a7-b94e-21df8af52498"
 
 # 访问令牌:App 上传与网页查看都用它做鉴权。
 # 生产环境建议改用 secret: wrangler secret put SYNC_TOKEN

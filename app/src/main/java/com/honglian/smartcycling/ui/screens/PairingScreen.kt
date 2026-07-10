@@ -312,7 +312,7 @@ private fun RadarScanView(scanning: Boolean) {
                 drawArc(
                     brush = Brush.sweepGradient(
                         colors = listOf(RadarEdge, BrandCyan.copy(alpha = 0.4f)),
-                        center = center
+                        center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)
                     ),
                     startAngle = 0f,
                     sweepAngle = 90f,
