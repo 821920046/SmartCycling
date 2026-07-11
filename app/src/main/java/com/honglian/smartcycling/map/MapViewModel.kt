@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.amap.api.maps.model.LatLng
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,16 +31,67 @@ class MapViewModel(app: Application) : AndroidViewModel(app) {
     private val _status = MutableStateFlow("")
     val status: StateFlow<String> = _status.asStateFlow()
 
+    private val _suggestions = MutableStateFlow<List<com.amap.api.services.core.PoiItem>>(emptyList())
+    val suggestions: StateFlow<List<com.amap.api.services.core.PoiItem>> = _suggestions.asStateFlow()
+
+    /** 防抖:每次新关键字进来取消上一次未发出的搜索 */
+    private var suggestionJob: Job? = null
+
     /** 退出骑行后清空上一次的路线/目的地,回到干净的可输入状态(保留起点定位缓存)。 */
     fun reset() {
         _route.value = emptyList()
         _destination.value = null
+        _suggestions.value = emptyList()
         _status.value = ""
+        suggestionJob?.cancel()
     }
 
+    /** 实时搜索联想词(带防抖:每次新关键字取消上一次未发出的搜索)。 */
+    fun searchSuggestions(keyword: String) {
+        suggestionJob?.cancel()
+        if (keyword.isBlank()) {
+            _suggestions.value = emptyList()
+            return
+        }
+        suggestionJob = viewModelScope.launch {
+            val debounced = keyword // 取消机制已替代实际 sleep,但保留结构供后续增加 300ms 延迟
+            val from = repo.currentPoint() ?: return@launch
+            val city = runCatching { repo.cityOf(from) }.getOrDefault("")
+            val pois = repo.searchPoiList(debounced, city)
+            _suggestions.value = pois
+        }
+    }
+
+    /** 从联想词列表中选择某一项并发起精确规划 */
+    fun planToPoi(poi: com.amap.api.services.core.PoiItem) {
+        val dest = poi.latLonPoint ?: return
+        viewModelScope.launch {
+            _suggestions.value = emptyList() // 清空下拉
+            _status.value = "定位中…"
+            val from = repo.currentPoint()
+            if (from == null) {
+                _status.value = "定位失败,请检查定位权限/GPS"
+                return@launch
+            }
+            _startPoint.value = LatLng(from.latitude, from.longitude)
+            _destination.value = LatLng(dest.latitude, dest.longitude)
+            
+            _status.value = "规划骑行路线…"
+            val points = repo.planRide(from, dest)
+            _route.value = points
+            _status.value = if (points.isEmpty()) {
+                "未找到骑行路线(请确认高德Key已开通搜索/路线服务)"
+            } else {
+                "路线已规划,可开始导航"
+            }
+        }
+    }
+
+    /** 旧接口(直接文字强搜), 保留用于用户不点下拉直接点搜索的 fallback */
     fun planTo(destination: String) {
         if (destination.isBlank()) return
         viewModelScope.launch {
+            _suggestions.value = emptyList()
             _status.value = "定位中…"
             val from = repo.currentPoint()
             if (from == null) {

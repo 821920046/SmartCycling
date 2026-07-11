@@ -90,6 +90,7 @@ fun RideScreen(
                 startPoint = startPoint,
                 currentLatLng = currentLatLng,
                 mapType = 3, // 强行夜间模式！赛博朋克必须黑底
+                onExitRequested = { showStopConfirm = true },
                 modifier = Modifier.fillMaxSize(),
             )
         } else {

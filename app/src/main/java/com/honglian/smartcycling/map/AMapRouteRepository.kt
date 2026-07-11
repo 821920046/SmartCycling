@@ -73,22 +73,30 @@ class AMapRouteRepository(private val context: Context) {
         poiSearch(name, city) ?: geocode(name, city)
 
     private suspend fun poiSearch(keyword: String, city: String): LatLonPoint? =
+        searchPoiList(keyword, city).firstOrNull()?.latLonPoint
+
+    /** 获取 POI 联想提示列表，默认返回最多 10 条 */
+    suspend fun searchPoiList(keyword: String, city: String): List<PoiItem> =
         suspendCancellableCoroutine { cont ->
+            if (keyword.isBlank()) {
+                if (cont.isActive) cont.resume(emptyList())
+                return@suspendCancellableCoroutine
+            }
             val query = PoiSearch.Query(keyword, "", city).apply {
-                pageSize = 5
+                pageSize = 10
                 pageNum = 1
             }
             val search = try {
                 PoiSearch(context, query)
             } catch (e: Exception) {
-                if (cont.isActive) cont.resume(null)
+                if (cont.isActive) cont.resume(emptyList())
                 return@suspendCancellableCoroutine
             }
             search.setOnPoiSearchListener(
                 object : PoiSearch.OnPoiSearchListener {
                     override fun onPoiSearched(result: PoiResult?, code: Int) {
-                        val point = result?.pois?.firstOrNull()?.latLonPoint
-                        if (cont.isActive) cont.resume(point)
+                        val pois = result?.pois ?: emptyList()
+                        if (cont.isActive) cont.resume(pois)
                     }
 
                     override fun onPoiItemSearched(item: PoiItem?, code: Int) = Unit

@@ -17,10 +17,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.amap.api.maps.AMapUtils
 import com.amap.api.maps.model.LatLng
+import com.amap.api.services.core.PoiItem
 import com.honglian.smartcycling.core.WheelPreset
 import com.honglian.smartcycling.ui.components.NavigationMapView
 import com.honglian.smartcycling.ui.theme.*
@@ -42,6 +44,9 @@ fun MapScreen(
     onNavigateToHistory: () -> Unit,
     destination: LatLng? = null,
     mapType: Int = 3,
+    suggestions: List<PoiItem> = emptyList(),
+    onSuggestionSelected: (PoiItem) -> Unit = {},
+    onKeywordChanged: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var query by remember { mutableStateOf("") }
@@ -72,7 +77,10 @@ fun MapScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(
                         value = query,
-                        onValueChange = { query = it },
+                        onValueChange = {
+                            query = it
+                            onKeywordChanged(it)
+                        },
                         label = { Text("输入目的地") },
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
@@ -92,10 +100,74 @@ fun MapScreen(
                         colors = ButtonDefaults.buttonColors(containerColor = BrandCyan, contentColor = Color(0xFF060913)),
                         shape = RoundedCornerShape(10.dp),
                         modifier = Modifier.height(52.dp)
-                    ) { 
-                        Text("规划", fontWeight = FontWeight.Bold) 
+                    ) {
+                        Text("规划", fontWeight = FontWeight.Bold)
                     }
                 }
+
+                // POI 智能联想下拉(仅在无已规划路线时显示,避免遮挡地图预览)
+                if (suggestions.isNotEmpty() && routePoints.isEmpty()) {
+                    Spacer(Modifier.height(4.dp))
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 220.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = CardDefaults.cardColors(containerColor = GlassBg.copy(alpha = 0.95f)),
+                    ) {
+                        Column(
+                            Modifier
+                                .verticalScroll(rememberScrollState())
+                                .padding(4.dp)
+                        ) {
+                            suggestions.take(8).forEach { poi ->
+                                val title = poi.title?.takeIf { it.isNotBlank() } ?: poi.name ?: "未知地点"
+                                val address = poi.snippet?.takeIf { it.isNotBlank() }
+                                    ?: poi.cityName ?: ""
+                                Surface(
+                                    onClick = {
+                                        focus.clearFocus()
+                                        onSuggestionSelected(poi)
+                                        query = "" // 清空输入框,避免空回填触发竞态联想
+                                    },
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = Color.Transparent,
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    Row(
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Text("📍", fontSize = 14.sp)
+                                        Spacer(Modifier.width(8.dp))
+                                        Column(Modifier.weight(1f)) {
+                                            Text(
+                                                title,
+                                                fontSize = 14.sp,
+                                                fontWeight = FontWeight.Medium,
+                                                color = SpeedText,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                            )
+                                            if (address.isNotBlank()) {
+                                                Text(
+                                                    address,
+                                                    fontSize = 12.sp,
+                                                    color = DataLabel,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 
                 Spacer(Modifier.height(8.dp))
 

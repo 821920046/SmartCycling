@@ -55,6 +55,7 @@ fun AppNav(
     val destination by mapViewModel.destination.collectAsState()
     val startPoint by mapViewModel.startPoint.collectAsState()
     val mapStatus by mapViewModel.status.collectAsState()
+    val suggestions by mapViewModel.suggestions.collectAsState()
     val currentWheel by settingsViewModel.wheel.collectAsState()
     
     // 全局地图样式和历史记录列表数据收集
@@ -104,7 +105,10 @@ fun AppNav(
                 onSelectWheel = { settingsViewModel.select(it) },
                 onNavigateToSettings = { navController.navigate(Routes.SETTINGS) },
                 onNavigateToHistory = { navController.navigate(Routes.HISTORY) },
-                mapType = mapType
+                mapType = mapType,
+                suggestions = suggestions,
+                onKeywordChanged = { mapViewModel.searchSuggestions(it) },
+                onSuggestionSelected = { poi -> mapViewModel.planToPoi(poi) },
             )
         }
         composable(Routes.RIDE) {

@@ -1,7 +1,5 @@
 package com.honglian.smartcycling.ui.components
 
-import android.location.Location
-import android.location.LocationManager
 import android.os.Bundle
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -14,7 +12,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
-import kotlinx.coroutines.delay
 import androidx.lifecycle.LifecycleEventObserver
 import com.amap.api.maps.model.LatLng
 import com.amap.api.navi.AMapNavi
@@ -51,6 +48,7 @@ fun NaviMapView(
     routePoints: List<LatLng> = emptyList(),
     startPoint: LatLng? = null,
     currentLatLng: LatLng? = null,
+    onExitRequested: () -> Unit = {},
     modifier: Modifier = Modifier,
     mapType: Int = 3,
 ) {
@@ -65,6 +63,7 @@ fun NaviMapView(
     val navi = remember { runCatching { AMapNavi.getInstance(appContext) }.getOrNull() }
     val destState = rememberUpdatedState(destination)
     val startState = rememberUpdatedState(startPoint)
+    val exitState = rememberUpdatedState(onExitRequested)
 
     if (naviView == null) {
         // 回退:普通跟随地图 + 目的地标记(仍可正常骑行,只是无转向语音)
@@ -91,6 +90,11 @@ fun NaviMapView(
             val options = naviView.viewOptions
             options.setAutoLockCar(true)
             options.setLayoutVisible(true)
+            options.isSettingMenuEnabled = false
+            options.isTrafficBarEnabled = false
+            options.isRouteListButtonShow = false
+            options.isCrossDisplayShow = false
+            options.isTrafficLine = false
             naviView.viewOptions = options
         }
         // 首次布局后隐藏原生覆盖层,并在 SDK 因导航事件重新显示时持续隐藏。
@@ -100,10 +104,7 @@ fun NaviMapView(
         runCatching { naviView.viewTreeObserver.addOnGlobalLayoutListener(hideOverlays) }
         var attachedListener: SimpleNaviListener? = null
         if (navi != null) {
-            // 关键:必须在 startNavi 之前开启外部GPS模式,
-            // 否则导航已用内置定位启动、无法再切换 → 退回默认中心(北京)。
-            runCatching { navi.setIsUseExtraGPSData(true) }
-            val listener = NaviCallbacks(navi, destState, startState)
+            val listener = NaviCallbacks(navi, destState, startState, exitState)
             runCatching { navi.addAMapNaviListener(listener) }
             attachedListener = listener
             runCatching { navi.setUseInnerVoice(voiceEnabled, false) }
@@ -131,47 +132,6 @@ fun NaviMapView(
         }
     }
 
-    // 第一性原理修复“地图停在北京”:
-    // 根因——导航引擎拿不到定位点(左上角“信号弱”即证),车标退回默认中心(北京)。
-    // 对策——用我们自己可靠的定位持续喂给导航的外部GPS通道(1Hz):
-    //   • 实时点用 FusedLocation(WGS-84 → 转 GCJ-02);
-    //   • 实时点尚未到达时,先用算路起点 startPoint(已是高德坐标)兜底,
-    //     保证一开始镜头就落在广州而不是北京。
-    //   setExtraGPSData 的 type=2 表示传入的是高德坐标(GCJ-02)。
-    val liveState = rememberUpdatedState(currentLatLng)
-    LaunchedEffect(navi) {
-        val n = navi ?: return@LaunchedEffect
-        var prev: Location? = null
-        while (true) {
-            val live = liveState.value
-            val gcj = if (live != null) toGcj02(context, live) else startState.value
-            if (gcj != null) {
-                runCatching {
-                    val loc = Location(LocationManager.GPS_PROVIDER).apply {
-                        latitude = gcj.latitude
-                        longitude = gcj.longitude
-                        accuracy = 5f
-                        time = System.currentTimeMillis()
-                    }
-                    // 用相邻点推算航向与速度,让导航车标“车头朝向骑行方向”且跟随更跟手。
-                    prev?.let { p ->
-                        val d = p.distanceTo(loc)
-                        if (d >= 0.8f) {
-                            loc.bearing = p.bearingTo(loc)
-                            loc.speed = d / 0.8f  // 每 800ms 位移 → m/s
-                        } else {
-                            loc.bearing = p.bearing
-                            loc.speed = 0f
-                        }
-                    }
-                    n.setExtraGPSData(2, loc)
-                    prev = loc
-                }
-            }
-            delay(800)
-        }
-    }
-
     // 语音开关:实时切换高德内置语音播报
     LaunchedEffect(voiceEnabled, navi) {
         runCatching { navi?.setUseInnerVoice(voiceEnabled, false) }
@@ -195,11 +155,13 @@ fun NaviMapView(
 
 /**
  * 导航回调(继承官方空实现适配器 SimpleNaviListener,仅重写所需方法)。
+ * - 退出拦截: 劫持所有 SDK 原生退出/到达行为，重定向到外部自定义大红按钮逻辑。
  */
 private class NaviCallbacks(
     private val navi: AMapNavi,
     private val destination: State<LatLng>,
     private val startPoint: State<LatLng?>,
+    private val onExitRequested: State<() -> Unit>,
 ) : SimpleNaviListener() {
     override fun onInitNaviSuccess() {
         val d = destination.value
@@ -219,6 +181,16 @@ private class NaviCallbacks(
     override fun onCalculateRouteSuccess(routeResult: AMapCalcRouteResult?) {
         runCatching { navi.startNavi(NaviType.GPS) }
     }
+
+    /** 劫持 SDK 原生退出按钮/NaviUI 退出: 重定向到外部自定义退出逻辑 */
+    override fun onNaviCancel() = runCatching { onExitRequested.value() }
+
+    /** 到达目的地后的行为: 不做强制退出, 仅记录日志, 由用户手动按大红按钮结束 */
+    override fun onArrivedDestination() { /* no-op — user decides when to stop */ }
+
+    /** 兜底: 部分情况下 SDK 仅回调此方法表示导航结束 */
+    override fun onEndEmulatorNavi() = runCatching { onExitRequested.value() }
+
 }
 
 /** 判断某视图子树中是否包含地图渲染面(用于在隐藏原生覆盖层时保留底图)。 */
