@@ -93,7 +93,6 @@ fun NaviMapView(
             options.isSettingMenuEnabled = false
             options.isTrafficBarEnabled = false
             options.isRouteListButtonShow = false
-            options.setCrossDisplayShow(false)
             options.isTrafficLine = false
             naviView.viewOptions = options
         }
