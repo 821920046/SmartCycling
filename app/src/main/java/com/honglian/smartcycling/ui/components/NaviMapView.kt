@@ -32,10 +32,23 @@ import com.amap.api.navi.model.NaviLatLng
  * - 健壮性:若导航 SDK 初始化失败(如 Key 未开通导航权限),
  *   自动回退到普通跟随地图,绝不闪退。
  */
+/**
+ * 安全从 Compose Context 中剥离出原始 Activity，防止部分 SDK 初始化因 ContextWrapper 抛异常。
+ */
+internal fun android.content.Context.findActivity(): android.app.Activity? {
+    var context = this
+    while (context is android.content.ContextWrapper) {
+        if (context is android.app.Activity) return context
+        context = context.baseContext
+    }
+    return null
+}
+
 @Composable
 fun NaviMapView(
     destination: LatLng,
     voiceEnabled: Boolean,
+    routePoints: List<LatLng> = emptyList(),
     startPoint: LatLng? = null,
     currentLatLng: LatLng? = null,
     modifier: Modifier = Modifier,
@@ -44,10 +57,11 @@ fun NaviMapView(
     val context = LocalContext.current
     val appContext = context.applicationContext
     val lifecycleOwner = LocalLifecycleOwner.current
+    val activityContext = context.findActivity() ?: context
 
     // 导航视图/实例创建可能因 Key 未开通导航、资源缺失等抛异常。
     // 一律 runCatching 兑底,失败则 naviView 为 null 并回退到跟随地图。
-    val naviView = remember { runCatching { AMapNaviView(context) }.getOrNull() }
+    val naviView = remember { runCatching { AMapNaviView(activityContext) }.getOrNull() }
     val navi = remember { runCatching { AMapNavi.getInstance(appContext) }.getOrNull() }
     val destState = rememberUpdatedState(destination)
     val startState = rememberUpdatedState(startPoint)
@@ -56,6 +70,7 @@ fun NaviMapView(
         // 回退:普通跟随地图 + 目的地标记(仍可正常骑行,只是无转向语音)
         NavigationMapView(
             modifier = modifier,
+            routePoints = routePoints,
             destination = destination,
             follow = true,
             followLocation = currentLatLng,

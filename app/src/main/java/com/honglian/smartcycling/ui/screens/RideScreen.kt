@@ -80,57 +80,62 @@ fun RideScreen(
 ) {
     var showStopConfirm by remember { mutableStateOf(false) }
 
-    Row(modifier.fillMaxSize().background(PanelBg)) {
-        // 左:导航
-        Box(Modifier.weight(1.3f).fillMaxHeight()) {
-            if (destination != null) {
-                NaviMapView(
-                    destination = destination,
-                    voiceEnabled = voiceEnabled,
-                    startPoint = startPoint,
-                    currentLatLng = currentLatLng,
-                    mapType = mapType,
-                    modifier = Modifier.fillMaxSize(),
-                )
-                Surface(
-                    onClick = onToggleVoice,
-                    shape = RoundedCornerShape(22.dp),
-                    color = if (voiceEnabled) BrandCyan else Color(0xFF37424F),
-                    contentColor = if (voiceEnabled) Color(0xFF04121A) else Color.White,
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .safeDrawingPadding()
-                        .padding(10.dp)
-                        .zIndex(2f),
-                ) {
-                    Text(
-                        if (voiceEnabled) "🔊 语音开" else "🔇 语音关",
-                        fontSize = 14.sp,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                    )
-                }
-            } else {
-                NavigationMapView(
-                    modifier = Modifier.fillMaxSize(),
-                    routePoints = routePoints,
-                    follow = true,
-                    followLocation = currentLatLng,
-                    mapType = mapType,
+    Box(modifier.fillMaxSize().background(Color.Black)) {
+        // 1. 底层：沉浸式全屏地图
+        if (destination != null) {
+            NaviMapView(
+                destination = destination,
+                voiceEnabled = voiceEnabled,
+                routePoints = routePoints,
+                startPoint = startPoint,
+                currentLatLng = currentLatLng,
+                mapType = 3, // 强行夜间模式！赛博朋克必须黑底
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            NavigationMapView(
+                modifier = Modifier.fillMaxSize(),
+                routePoints = routePoints,
+                follow = true,
+                followLocation = currentLatLng,
+                mapType = 3,
+            )
+        }
+
+        // 2. 左上角：悬浮语音开关
+        if (destination != null) {
+            Surface(
+                onClick = onToggleVoice,
+                shape = RoundedCornerShape(22.dp),
+                color = if (voiceEnabled) BrandCyan else Color(0xAA37424F),
+                contentColor = if (voiceEnabled) Color(0xFF04121A) else Color.White,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .safeDrawingPadding()
+                    .padding(16.dp)
+                    .zIndex(2f),
+            ) {
+                Text(
+                    if (voiceEnabled) "🔊 语音开" else "🔇 语音关",
+                    fontSize = 14.sp,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
                 )
             }
         }
-        // 左右之间的细分隔线,让地图与仪表盘有自然过渡
-        Box(Modifier.fillMaxHeight().width(1.dp).background(DividerNavy))
-        // 右:数据仪表盘(按屏幕高度自适应,保证不滚动即可整屏显示)
+
+        // 3. 右侧：悬浮数据仪表盘 (Glassmorphism HUD)
         BoxWithConstraints(
             Modifier
-                .weight(1.5f) // 加宽右边大面板以容纳双按钮和精致布局
+                .align(Alignment.CenterEnd)
                 .fillMaxHeight()
-                .background(Brush.verticalGradient(listOf(PanelBgTop, PanelBgBottom)))
-                .safeDrawingPadding(),
+                .width(320.dp) // 固定合理宽度
+                .padding(vertical = 16.dp, horizontal = 16.dp)
+                .background(Color(0x8804121A), RoundedCornerShape(24.dp))
+                .border(1.dp, BrandCyan.copy(alpha = 0.5f), RoundedCornerShape(24.dp))
+                .safeDrawingPadding()
+                .zIndex(2f),
         ) {
-            val maxRing = min(maxWidth.value * 0.82f, 200f).coerceAtLeast(80f)
-            val ring = (maxHeight - 190.dp).coerceIn(80.dp, maxRing.dp)
+            val ringDiameter = min(maxWidth.value * 0.82f, 200f).coerceAtLeast(80f)
             
             Box(Modifier.fillMaxSize()) {
                 Column(
@@ -145,7 +150,7 @@ fun RideScreen(
                         value = if (cadenceMode) state.cadenceRpm else state.speedKmh,
                         unit = if (cadenceMode) "rpm" else "km/h",
                         maxValue = if (cadenceMode) 120.0 else 60.0,
-                        diameterDp = ring.value.toInt(),
+                        diameterDp = ringDiameter.toInt(),
                     )
                     Text(
                         when {
@@ -161,7 +166,7 @@ fun RideScreen(
                     Card(
                         modifier = Modifier.fillMaxWidth().border(1.dp, GlassBorder, RoundedCornerShape(14.dp)),
                         shape = RoundedCornerShape(14.dp),
-                        colors = CardDefaults.cardColors(containerColor = GlassBg),
+                        colors = CardDefaults.cardColors(containerColor = Color(0x33FFFFFF)),
                     ) {
                         DataGrid(state, Modifier.padding(vertical = 4.dp))
                     }
@@ -177,10 +182,7 @@ fun RideScreen(
                             shape = RoundedCornerShape(12.dp),
                             color = if (state.isPaused) BrandCyan else PauseOrange,
                             contentColor = Color(0xFF060913),
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(46.dp)
-                                .zIndex(2f),
+                            modifier = Modifier.weight(1f).height(46.dp)
                         ) {
                             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                 Text(
@@ -196,10 +198,7 @@ fun RideScreen(
                             shape = RoundedCornerShape(12.dp),
                             color = StopRed,
                             contentColor = Color.White,
-                            modifier = Modifier
-                                .weight(1.3f)
-                                .height(46.dp)
-                                .zIndex(2f),
+                            modifier = Modifier.weight(1.3f).height(46.dp)
                         ) {
                             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                 Text("结束骑行", fontSize = 15.sp, fontWeight = FontWeight.Bold)
@@ -213,7 +212,7 @@ fun RideScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(Color(0x33000000))
+                            .background(Color(0x33000000), RoundedCornerShape(24.dp))
                             .clickable(onClick = onTogglePause)
                     )
                 }
