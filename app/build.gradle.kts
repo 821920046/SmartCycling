@@ -105,8 +105,9 @@ dependencies {
     implementation("androidx.room:room-ktx:2.6.1")
     ksp("androidx.room:room-compiler:2.6.1")
 
-    // 定位
-    implementation("com.google.android.gms:play-services-location:21.3.0")
+    // 定位:统一使用高德定位(已含于下方 navi-3dmap-location-search 合包)。
+    // 移除 Google play-services-location:国内无 Google Play 服务的手机上 FusedLocation 永不回调,
+    // 会导致骑行里程/速度/实时跟随全部失效(病因之一)。
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 

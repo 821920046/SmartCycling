@@ -36,7 +36,7 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
     private val _state = MutableStateFlow(RideState())
     val state: StateFlow<RideState> = _state.asStateFlow()
 
-    /** 当前真实定位(WGS-84,取自 FusedLocation),用于驱动导航地图跟随真实位置。 */
+    /** 当前真实定位(GCJ-02,取自高德 AMapLocation),用于语音诱导喂数与真实位置跟随。 */
     private val _currentLatLng = MutableStateFlow<LatLng?>(null)
     val currentLatLng: StateFlow<LatLng?> = _currentLatLng.asStateFlow()
 

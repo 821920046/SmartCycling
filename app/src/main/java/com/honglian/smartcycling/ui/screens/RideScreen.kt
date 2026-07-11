@@ -44,7 +44,7 @@ import com.honglian.smartcycling.ride.RideState
 import com.honglian.smartcycling.ride.SensorMode
 import com.honglian.smartcycling.ride.SpeedSource
 import com.honglian.smartcycling.ui.components.DataGrid
-import com.honglian.smartcycling.ui.components.NaviMapView
+import com.honglian.smartcycling.ui.components.NaviVoiceGuide
 import com.honglian.smartcycling.ui.components.NavigationMapView
 import com.honglian.smartcycling.ui.components.SpeedRing
 import com.honglian.smartcycling.ui.theme.BrandCyan
@@ -81,25 +81,24 @@ fun RideScreen(
     var showStopConfirm by remember { mutableStateOf(false) }
 
     Box(modifier.fillMaxSize().background(Color.Black)) {
-        // 1. 底层：沉浸式全屏地图
+        // 1. 底层：沉浸式全屏实时地图
+        //    第一性修正:不再使用 AMapNaviView(其内部定位器与 App 定位割裂 → 镜头停留北京、不实时)。
+        //    统一使用可靠的 NavigationMapView(TextureMapView + 高德自带 LOCATION_TYPE_FOLLOW 实时跟随),
+        //    这与地图页成功定位到广州是同一套定位机制,并叠加已规划的骑行路线。
+        NavigationMapView(
+            modifier = Modifier.fillMaxSize(),
+            routePoints = routePoints,
+            destination = destination,
+            follow = true,
+            mapType = 3, // 夜间模式:赛博朋克黑底
+        )
+        // turn-by-turn 语音诱导(无界面 headless 引擎,用 App 真实定位喂数;失败只影响语音,不影响地图)
         if (destination != null) {
-            NaviMapView(
+            NaviVoiceGuide(
                 destination = destination,
-                voiceEnabled = voiceEnabled,
-                routePoints = routePoints,
                 startPoint = startPoint,
                 currentLatLng = currentLatLng,
-                mapType = 3, // 强行夜间模式！赛博朋克必须黑底
-                onExitRequested = { showStopConfirm = true },
-                modifier = Modifier.fillMaxSize(),
-            )
-        } else {
-            NavigationMapView(
-                modifier = Modifier.fillMaxSize(),
-                routePoints = routePoints,
-                follow = true,
-                followLocation = currentLatLng,
-                mapType = 3,
+                enabled = voiceEnabled,
             )
         }
 
