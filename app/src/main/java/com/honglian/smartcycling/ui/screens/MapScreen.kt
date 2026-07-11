@@ -121,7 +121,7 @@ fun MapScreen(
                                 .padding(4.dp)
                         ) {
                             suggestions.take(8).forEach { poi ->
-                                val title = poi.title?.takeIf { it.isNotBlank() } ?: poi.name ?: "未知地点"
+                                val title = poi.title?.takeIf { it.isNotBlank() } ?: "未知地点"
                                 val address = poi.snippet?.takeIf { it.isNotBlank() }
                                     ?: poi.cityName ?: ""
                                 Surface(

@@ -93,7 +93,7 @@ fun NaviMapView(
             options.isSettingMenuEnabled = false
             options.isTrafficBarEnabled = false
             options.isRouteListButtonShow = false
-            options.isCrossDisplayShow = false
+            options.setCrossDisplayShow(false)
             options.isTrafficLine = false
             naviView.viewOptions = options
         }
@@ -182,14 +182,11 @@ private class NaviCallbacks(
         runCatching { navi.startNavi(NaviType.GPS) }
     }
 
-    /** 劫持 SDK 原生退出按钮/NaviUI 退出: 重定向到外部自定义退出逻辑 */
-    override fun onNaviCancel() = runCatching { onExitRequested.value() }
+    /** 劫持到达目的地回调: 不做强制退出, 仅记录日志, 由用户手动按大红按钮结束 */
+    override fun onArriveDestination() { /* no-op — user decides when to stop */ }
 
-    /** 到达目的地后的行为: 不做强制退出, 仅记录日志, 由用户手动按大红按钮结束 */
-    override fun onArrivedDestination() { /* no-op — user decides when to stop */ }
-
-    /** 兜底: 部分情况下 SDK 仅回调此方法表示导航结束 */
-    override fun onEndEmulatorNavi() = runCatching { onExitRequested.value() }
+    /** 兜底: 部分情况下 SDK 仅回调此方法表示导航结束, 重定向到退出确认 */
+    override fun onEndEmulatorNavi() { runCatching { onExitRequested.value() } }
 
 }
 
