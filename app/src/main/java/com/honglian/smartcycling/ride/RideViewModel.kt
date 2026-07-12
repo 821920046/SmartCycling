@@ -40,6 +40,10 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
     private val _currentLatLng = MutableStateFlow<LatLng?>(null)
     val currentLatLng: StateFlow<LatLng?> = _currentLatLng.asStateFlow()
 
+    /** 已骑行轨迹(GCJ-02),用于在地图上实时回放“走过的路”。 */
+    private val _traveledPath = MutableStateFlow<List<LatLng>>(emptyList())
+    val traveledPath: StateFlow<List<LatLng>> = _traveledPath.asStateFlow()
+
     private var rideJob: Job? = null
     private val trackPoints = mutableListOf<TrackPointEntity>()
 
@@ -68,6 +72,7 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
         lastActiveAt = System.currentTimeMillis()
         accumulatedDurationSec = 0L
         trackPoints.clear()
+        _traveledPath.value = emptyList()
         _state.value = RideState(isRiding = true, isPaused = false)
 
         rideJob = viewModelScope.launch {
@@ -109,7 +114,11 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
             if (_state.value.isPaused) return@collect
             lastGpsSpeed = sample.speedKmh
             lastGpsAt = System.currentTimeMillis()
-            _currentLatLng.value = LatLng(sample.latitude, sample.longitude)
+            val here = LatLng(sample.latitude, sample.longitude)
+            _currentLatLng.value = here
+            // 追加到已走轨迹(上限保护,防超长骑行内存膨胀)
+            val prevPath = _traveledPath.value
+            _traveledPath.value = if (prevPath.size >= 8000) prevPath.drop(1) + here else prevPath + here
             distanceMeters += sample.deltaMeters
             trackPoints += TrackPointEntity(
                 rideId = 0,

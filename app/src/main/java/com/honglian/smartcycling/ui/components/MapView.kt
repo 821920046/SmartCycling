@@ -22,6 +22,7 @@ import com.amap.api.maps.model.LatLngBounds
 import com.amap.api.maps.model.Marker
 import com.amap.api.maps.model.MarkerOptions
 import com.amap.api.maps.model.MyLocationStyle
+import com.amap.api.maps.model.Polyline
 import com.amap.api.maps.model.PolylineOptions
 
 /**
@@ -38,6 +39,8 @@ import com.amap.api.maps.model.PolylineOptions
 fun NavigationMapView(
     modifier: Modifier = Modifier,
     routePoints: List<LatLng> = emptyList(),
+    /** 已骑行轨迹(GCJ-02):在规划线之上叠加一条橙色“走过的路”。 */
+    traveledPoints: List<LatLng> = emptyList(),
     destination: LatLng? = null,
     follow: Boolean = false,
     showMyLocation: Boolean = true,
@@ -94,9 +97,14 @@ fun NavigationMapView(
     }
 
 
+    // 已走轨迹折线(持久引用,逐秒 setPoints 更新,避免每秒 clear 重绘全图)
+    val traveledLine = remember { mutableStateOf<Polyline?>(null) }
+
     LaunchedEffect(routePoints, destination) {
         val aMap = mapView.map ?: return@LaunchedEffect
         aMap.clear(true)
+        // clear(true) 会一并移除已走轨迹折线,置空引用以便下一次重建。
+        traveledLine.value = null
         // 目的地红色标记
         destination?.let { aMap.addMarker(MarkerOptions().position(it).title("目的地")) }
         if (routePoints.size >= 2) {
@@ -130,6 +138,26 @@ fun NavigationMapView(
             aMap.addMarker(MarkerOptions().position(gcj).title("我的位置"))
         }.getOrNull()
         if (follow) runCatching { aMap.moveCamera(CameraUpdateFactory.newLatLngZoom(gcj, 17f)) }
+    }
+
+    // 实时回放“走过的路”:橙色折线,叠在绿色规划线之上。
+    LaunchedEffect(traveledPoints) {
+        val aMap = mapView.map ?: return@LaunchedEffect
+        if (traveledPoints.size < 2) return@LaunchedEffect
+        val existing = traveledLine.value
+        if (existing != null) {
+            runCatching { existing.points = traveledPoints }
+        } else {
+            traveledLine.value = runCatching {
+                aMap.addPolyline(
+                    PolylineOptions()
+                        .addAll(traveledPoints)
+                        .width(16f)
+                        .color(0xFFF59E0B.toInt())
+                        .zIndex(2f),
+                )
+            }.getOrNull()
+        }
     }
 
     AndroidView(factory = { mapView }, modifier = modifier)
