@@ -39,6 +39,9 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     private val _autoPauseThresholdKmh = MutableStateFlow(container.settings.autoPauseThresholdKmh)
     val autoPauseThresholdKmh: StateFlow<Float> = _autoPauseThresholdKmh.asStateFlow()
 
+    private val _highContrast = MutableStateFlow(container.settings.highContrast)
+    val highContrast: StateFlow<Boolean> = _highContrast.asStateFlow()
+
     fun select(preset: WheelPreset) {
         container.settings.wheelPreset = preset
         container.sensorManager.wheelCircumferenceM = preset.circumferenceM
@@ -80,6 +83,11 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
         val v = kmh.coerceIn(0.5f, 5f)
         container.settings.autoPauseThresholdKmh = v
         _autoPauseThresholdKmh.value = v
+    }
+
+    fun updateHighContrast(enabled: Boolean) {
+        container.settings.highContrast = enabled
+        _highContrast.value = enabled
     }
 }
 

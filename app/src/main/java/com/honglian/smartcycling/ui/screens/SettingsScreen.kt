@@ -43,6 +43,7 @@ fun SettingsScreen(
     val riderWeight by viewModel.riderWeightKg.collectAsState()
     val autoPauseEnabled by viewModel.autoPauseEnabled.collectAsState()
     val autoPauseThreshold by viewModel.autoPauseThresholdKmh.collectAsState()
+    val highContrast by viewModel.highContrast.collectAsState()
 
     var nameInput by remember { mutableStateOf(riderName) }
     var weightInput by remember { mutableStateOf(riderWeight.toInt().toString()) }
@@ -239,6 +240,21 @@ fun SettingsScreen(
                             valueRange = 0.5f..5f,
                             enabled = autoPauseEnabled
                         )
+                        Spacer(Modifier.height(12.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text("日照高对比模式", color = SpeedText, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                Text("强光下加深仪表盘背景、提升文字对比", color = DataLabel, fontSize = 12.sp)
+                            }
+                            Switch(
+                                checked = highContrast,
+                                onCheckedChange = { viewModel.updateHighContrast(it) }
+                            )
+                        }
                     }
                 }
 

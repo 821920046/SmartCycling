@@ -75,6 +75,16 @@ class Settings(context: Context) {
         get() = prefs.getFloat(KEY_AUTO_PAUSE_TH, 1.5f)
         set(value) { prefs.edit().putFloat(KEY_AUTO_PAUSE_TH, value).apply() }
 
+    /** 日照高对比模式(强光下提升仪表盘可读性)。 */
+    var highContrast: Boolean
+        get() = prefs.getBoolean(KEY_HIGH_CONTRAST, false)
+        set(value) { prefs.edit().putBoolean(KEY_HIGH_CONTRAST, value).apply() }
+
+    /** 首次引导是否已展示。 */
+    var onboardingShown: Boolean
+        get() = prefs.getBoolean(KEY_ONBOARDING, false)
+        set(value) { prefs.edit().putBoolean(KEY_ONBOARDING, value).apply() }
+
     companion object {
         private const val KEY_WHEEL = "wheel_preset"
         private const val KEY_DEVICE_ID = "device_id"
@@ -85,6 +95,8 @@ class Settings(context: Context) {
         private const val KEY_WEIGHT = "rider_weight_kg"
         private const val KEY_AUTO_PAUSE = "auto_pause_enabled"
         private const val KEY_AUTO_PAUSE_TH = "auto_pause_threshold"
+        private const val KEY_HIGH_CONTRAST = "high_contrast"
+        private const val KEY_ONBOARDING = "onboarding_shown"
     }
 }
 

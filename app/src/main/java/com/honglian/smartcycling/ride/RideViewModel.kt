@@ -44,6 +44,10 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
     private val _traveledPath = MutableStateFlow<List<LatLng>>(emptyList())
     val traveledPath: StateFlow<List<LatLng>> = _traveledPath.asStateFlow()
 
+    /** 最近一次完成骑行的成绩快照,用于结束后成绩总结页展示。 */
+    private val _lastSummary = MutableStateFlow<RideState?>(null)
+    val lastSummary: StateFlow<RideState?> = _lastSummary.asStateFlow()
+
     private var rideJob: Job? = null
     private val trackPoints = mutableListOf<TrackPointEntity>()
 
@@ -238,6 +242,8 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
         rideJob = null
         val s = _state.value
         _state.value = s.copy(isRiding = false, isPaused = false)
+        // 捕获成绩快照(时长过短视为误触发,不生成成绩)
+        _lastSummary.value = if (s.durationSec < 3) null else s
         if (s.durationSec < 3) return  // 忽略误触发
         val pointsSnapshot = trackPoints.toList()
         viewModelScope.launch {
