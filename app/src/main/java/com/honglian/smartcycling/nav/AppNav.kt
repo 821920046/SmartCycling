@@ -27,6 +27,7 @@ object Routes {
     const val RIDE = "ride"
     const val SETTINGS = "settings"
     const val HISTORY = "history"
+    const val SUMMARY = "summary"
 }
 
 /**
@@ -65,6 +66,10 @@ fun AppNav(
 
     // 语音导航开关(跨横竖屏重建保持)
     var voiceEnabled by rememberSaveable { mutableStateOf(true) }
+    // 日照高对比模式(设置页可切换)
+    val highContrast by settingsViewModel.highContrast.collectAsState()
+    // 首次引导(未展示过则弹出一次)
+    var showOnboarding by rememberSaveable { mutableStateOf(!container.settings.onboardingShown) }
 
     NavHost(
         navController = navController, 
@@ -127,14 +132,34 @@ fun AppNav(
                 onTogglePause = { rideViewModel.togglePause() },
                 onStop = {
                     rideViewModel.stopRide()
-                    // 清空上一次路线/目的地,回到地图即为干净可输入状态(便于中途换目的地)
-                    mapViewModel.reset()
                     onExitRide()
-                    navController.navigate(Routes.MAP) {
-                        popUpTo(Routes.RIDE) { inclusive = true }
+                    if (rideViewModel.lastSummary.value != null) {
+                        // 有有效成绩 → 进入成绩总结页
+                        navController.navigate(Routes.SUMMARY) {
+                            popUpTo(Routes.RIDE) { inclusive = true }
+                        }
+                    } else {
+                        // 误触发(时长过短):清空路线直接回地图
+                        mapViewModel.reset()
+                        navController.navigate(Routes.MAP) {
+                            popUpTo(Routes.RIDE) { inclusive = true }
+                        }
                     }
                 },
-                mapType = mapType
+                mapType = mapType,
+                highContrast = highContrast
+            )
+        }
+        composable(Routes.SUMMARY) {
+            val summary by rideViewModel.lastSummary.collectAsState()
+            RideSummaryScreen(
+                state = summary,
+                onDone = {
+                    mapViewModel.reset()
+                    navController.navigate(Routes.MAP) {
+                        popUpTo(Routes.SUMMARY) { inclusive = true }
+                    }
+                },
             )
         }
         composable(Routes.SETTINGS) {
@@ -158,6 +183,13 @@ fun AppNav(
                 mapType = mapType
             )
         }
+    }
+
+    if (showOnboarding) {
+        OnboardingDialog(onDismiss = {
+            container.settings.onboardingShown = true
+            showOnboarding = false
+        })
     }
 }
 

@@ -18,6 +18,8 @@ data class LocationSample(
     val speedKmh: Double,
     /** 与上一点的直线距离(米)，用于里程积分。 */
     val deltaMeters: Double,
+    /** 海拔高度(米),来自 GPS;0 表示不可用。 */
+    val altitude: Double = 0.0,
     val timestampMs: Long,
 )
 
@@ -87,6 +89,7 @@ class LocationTracker(private val context: Context) {
                     longitude = lng,
                     speedKmh = speedKmh,
                     deltaMeters = delta,
+                    altitude = loc.altitude,
                     timestampMs = System.currentTimeMillis(),
                 ),
             )

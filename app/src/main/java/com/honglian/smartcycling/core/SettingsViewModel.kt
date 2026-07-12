@@ -30,6 +30,15 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     private val _mapType = MutableStateFlow(container.settings.mapType)
     val mapType: StateFlow<Int> = _mapType.asStateFlow()
 
+    private val _riderWeightKg = MutableStateFlow(container.settings.riderWeightKg)
+    val riderWeightKg: StateFlow<Float> = _riderWeightKg.asStateFlow()
+
+    private val _autoPauseEnabled = MutableStateFlow(container.settings.autoPauseEnabled)
+    val autoPauseEnabled: StateFlow<Boolean> = _autoPauseEnabled.asStateFlow()
+
+    private val _autoPauseThresholdKmh = MutableStateFlow(container.settings.autoPauseThresholdKmh)
+    val autoPauseThresholdKmh: StateFlow<Float> = _autoPauseThresholdKmh.asStateFlow()
+
     fun select(preset: WheelPreset) {
         container.settings.wheelPreset = preset
         container.sensorManager.wheelCircumferenceM = preset.circumferenceM
@@ -54,6 +63,23 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun updateMapType(type: Int) {
         container.settings.mapType = type
         _mapType.value = type
+    }
+
+    fun updateRiderWeight(kg: Float) {
+        val v = kg.coerceIn(30f, 200f)
+        container.settings.riderWeightKg = v
+        _riderWeightKg.value = v
+    }
+
+    fun updateAutoPauseEnabled(enabled: Boolean) {
+        container.settings.autoPauseEnabled = enabled
+        _autoPauseEnabled.value = enabled
+    }
+
+    fun updateAutoPauseThreshold(kmh: Float) {
+        val v = kmh.coerceIn(0.5f, 5f)
+        container.settings.autoPauseThresholdKmh = v
+        _autoPauseThresholdKmh.value = v
     }
 }
 

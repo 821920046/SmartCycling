@@ -40,8 +40,12 @@ fun SettingsScreen(
     val cloudSyncUrl by viewModel.cloudSyncUrl.collectAsState()
     val cloudSyncToken by viewModel.cloudSyncToken.collectAsState()
     val mapType by viewModel.mapType.collectAsState()
+    val riderWeight by viewModel.riderWeightKg.collectAsState()
+    val autoPauseEnabled by viewModel.autoPauseEnabled.collectAsState()
+    val autoPauseThreshold by viewModel.autoPauseThresholdKmh.collectAsState()
 
     var nameInput by remember { mutableStateOf(riderName) }
+    var weightInput by remember { mutableStateOf(riderWeight.toInt().toString()) }
     var urlInput by remember { mutableStateOf(cloudSyncUrl) }
     var tokenInput by remember { mutableStateOf(cloudSyncToken) }
     var showWheelDialog by remember { mutableStateOf(false) }
@@ -169,6 +173,72 @@ fun SettingsScreen(
                                 Icon(Icons.Default.ArrowRight, contentDescription = null, tint = BrandCyan)
                             }
                         }
+                    }
+                }
+
+                // 2b. 训练与骑行偏好(体重/自动暂停)
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, GlassBorder, RoundedCornerShape(14.dp)),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = GlassBg)
+                ) {
+                    Column(Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Favorite, contentDescription = null, tint = BrandCyan)
+                            Spacer(Modifier.width(8.dp))
+                            Text("训练与骑行偏好", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = SpeedText)
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        OutlinedTextField(
+                            value = weightInput,
+                            onValueChange = {
+                                weightInput = it
+                                it.toFloatOrNull()?.let { w -> viewModel.updateRiderWeight(w) }
+                            },
+                            label = { Text("体重 (kg，用于卡路里估算)") },
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = BrandCyan,
+                                unfocusedBorderColor = DividerNavy,
+                                focusedLabelColor = BrandCyan,
+                                unfocusedLabelColor = DataLabel,
+                                focusedTextColor = SpeedText,
+                                unfocusedTextColor = SpeedText
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("自动暂停", color = SpeedText, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                            Switch(
+                                checked = autoPauseEnabled,
+                                onCheckedChange = { viewModel.updateAutoPauseEnabled(it) }
+                            )
+                        }
+                        Text(
+                            "静止超过 5 秒自动暂停计时，恢复移动自动继续。",
+                            color = DataLabel,
+                            fontSize = 12.sp
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "触发阈值: %.1f km/h".format(autoPauseThreshold),
+                            color = SpeedText,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Slider(
+                            value = autoPauseThreshold,
+                            onValueChange = { viewModel.updateAutoPauseThreshold(it) },
+                            valueRange = 0.5f..5f,
+                            enabled = autoPauseEnabled
+                        )
                     }
                 }
 

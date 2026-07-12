@@ -62,6 +62,14 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
     private var lastActiveAt = 0L
     private var accumulatedDurationSec = 0L
 
+    // 训练指标与偏好(startRide 时从设置载入)
+    private var elevationGain = 0.0
+    private var caloriesKcal = 0.0
+    private var lastAltitude: Double? = null
+    private var autoPauseEnabled = true
+    private var autoPauseThresholdKmh = 1.5
+    private var riderWeightKg = 65.0
+
     fun startRide() {
         if (_state.value.isRiding) return
         startTime = System.currentTimeMillis()
@@ -71,6 +79,12 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
         sensorMode = SensorMode.SPEED
         lastActiveAt = System.currentTimeMillis()
         accumulatedDurationSec = 0L
+        elevationGain = 0.0
+        caloriesKcal = 0.0
+        lastAltitude = null
+        autoPauseEnabled = settings.autoPauseEnabled
+        autoPauseThresholdKmh = settings.autoPauseThresholdKmh.toDouble()
+        riderWeightKg = settings.riderWeightKg.toDouble()
         trackPoints.clear()
         _traveledPath.value = emptyList()
         _state.value = RideState(isRiding = true, isPaused = false)
@@ -120,6 +134,13 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
             val prevPath = _traveledPath.value
             _traveledPath.value = if (prevPath.size >= 8000) prevPath.drop(1) + here else prevPath + here
             distanceMeters += sample.deltaMeters
+            // 累计爬升(GPS 高程,+0.5m 阈值过滤噪声)
+            val alt = sample.altitude
+            if (alt != 0.0) {
+                val prevAlt = lastAltitude
+                if (prevAlt != null && alt - prevAlt >= 0.5) elevationGain += (alt - prevAlt)
+                lastAltitude = alt
+            }
             trackPoints += TrackPointEntity(
                 rideId = 0,
                 latitude = sample.latitude,
@@ -132,6 +153,16 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
 
     private var lastGpsAt = 0L
     private fun hasFreshGps() = System.currentTimeMillis() - lastGpsAt < STALE_MS
+
+    /** 按骑行速度估算 MET(代谢当量),用于卡路里估算。 */
+    private fun metForSpeed(kmh: Double): Double = when {
+        kmh < 16.0 -> 4.0
+        kmh < 19.0 -> 6.8
+        kmh < 22.0 -> 8.0
+        kmh < 25.0 -> 10.0
+        kmh < 30.0 -> 12.0
+        else -> 15.8
+    }
 
     fun togglePause() {
         val s = _state.value
@@ -158,24 +189,25 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
                 else -> 0.0
             }
 
-            // 自动暂停判定：时速大于 1.5 km/h 判定为运动，否则为静止
-            val hasMotion = rawSpeed > 1.5
+            // 自动暂停判定：可配置阈值/开关;静止超 5 秒自动暂停,移动自动恢复
+            val hasMotion = rawSpeed > autoPauseThresholdKmh
             var nextPaused = stateVal.isPaused
 
             if (hasMotion) {
                 lastActiveAt = now
-                if (stateVal.isPaused) {
+                if (stateVal.isPaused && autoPauseEnabled) {
                     nextPaused = false // 自动恢复
                 }
             } else {
-                // 静止状态下，超过 5 秒未移动，自动暂停
-                if (!stateVal.isPaused && (now - lastActiveAt >= 5000L)) {
+                if (autoPauseEnabled && !stateVal.isPaused && (now - lastActiveAt >= 5000L)) {
                     nextPaused = true
                 }
             }
 
             if (!nextPaused) {
                 accumulatedDurationSec++
+                // 卡路里累计(MET × 体重 × 3.5 / 200 kcal/min,按秒累加)
+                caloriesKcal += metForSpeed(rawSpeed) * riderWeightKg * 3.5 / 200.0 / 60.0
             }
 
             val curCadence = if (now - lastCadenceAt < STALE_MS) cadence else 0.0
@@ -193,6 +225,9 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
                 avgSpeedKmh = avg,
                 maxSpeedKmh = maxOf(stateVal.maxSpeedKmh, rawSpeed),
                 speedSource = if (useSensor) SpeedSource.SENSOR_WHEEL else SpeedSource.GPS,
+                calories = caloriesKcal,
+                elevationGainM = elevationGain,
+                sensorFresh = sensorFresh,
                 isPaused = nextPaused
             )
         }

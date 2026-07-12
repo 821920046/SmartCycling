@@ -42,6 +42,12 @@ fun DataGrid(state: RideState, modifier: Modifier = Modifier) {
                 DataCell(Modifier.weight(1f), "🔄 0 rpm", "平均踏频")
             }
         }
+        HorizontalDivider(color = DividerNavy)
+        Row(Modifier.fillMaxWidth()) {
+            DataCell(Modifier.weight(1f), "🔥 %.0f kcal".format(state.calories), "消耗热量")
+            VerticalDivider(color = DividerNavy)
+            DataCell(Modifier.weight(1f), "⛰ %.0f m".format(state.elevationGainM), "累计爬升")
+        }
     }
 }
 

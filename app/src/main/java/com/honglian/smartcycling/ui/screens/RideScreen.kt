@@ -73,6 +73,7 @@ fun RideScreen(
     onTogglePause: () -> Unit = {},
     onStop: () -> Unit,
     mapType: Int = 3,
+    highContrast: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     var showStopConfirm by remember { mutableStateOf(false) }
@@ -85,6 +86,8 @@ fun RideScreen(
     var offsetX by rememberSaveable { mutableStateOf(0f) }
     var offsetY by rememberSaveable { mutableStateOf(0f) }
     var scale by rememberSaveable { mutableStateOf(1f) }
+    // 锁屏防误触:锁定后拦截地图/仪表盘触摸,暂停/结束按钮失效,长按锁按钮解锁
+    var locked by rememberSaveable { mutableStateOf(false) }
 
     Box(modifier.fillMaxSize().background(Color.Black)) {
         // 1. 底层:全屏实时跟随地图 + 已规划路线
@@ -192,8 +195,8 @@ fun RideScreen(
                 }
                 .padding(12.dp)
                 .width(300.dp)
-                .background(Color(0x8804121A), RoundedCornerShape(24.dp))
-                .border(1.dp, BrandCyan.copy(alpha = 0.5f), RoundedCornerShape(24.dp))
+                .background(if (highContrast) Color(0xF3020A12) else Color(0x8804121A), RoundedCornerShape(24.dp))
+                .border(1.dp, BrandCyan.copy(alpha = if (highContrast) 0.9f else 0.5f), RoundedCornerShape(24.dp))
                 .pointerInput(Unit) {
                     detectTransformGestures { _, pan, zoom, _ ->
                         // pan 为本地(已缩放)坐标,乘 scale 换算为屏幕位移,拖动手感与手指一致。
@@ -240,7 +243,7 @@ fun RideScreen(
             Card(
                 modifier = Modifier.fillMaxWidth().border(1.dp, GlassBorder, RoundedCornerShape(14.dp)),
                 shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0x33FFFFFF)),
+                colors = CardDefaults.cardColors(containerColor = if (highContrast) Color(0x59FFFFFF) else Color(0x33FFFFFF)),
             ) {
                 DataGrid(state, Modifier.padding(vertical = 4.dp))
             }
@@ -257,7 +260,7 @@ fun RideScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Surface(
-                onClick = onTogglePause,
+                onClick = { if (!locked) onTogglePause() },
                 shape = RoundedCornerShape(14.dp),
                 color = if (state.isPaused) BrandCyan else PauseOrange,
                 contentColor = Color(0xFF060913),
@@ -275,7 +278,7 @@ fun RideScreen(
                 }
             }
             Surface(
-                onClick = { showStopConfirm = true },
+                onClick = { if (!locked) showStopConfirm = true },
                 shape = RoundedCornerShape(14.dp),
                 color = StopRed,
                 contentColor = Color.White,
@@ -288,6 +291,41 @@ fun RideScreen(
                     Text("■ 结束骑行", fontSize = 15.sp, fontWeight = FontWeight.Bold)
                 }
             }
+        }
+
+        // 5. 锁屏防误触按钮(左下角):点按锁定,长按解锁
+        Box(
+            Modifier
+                .align(Alignment.BottomStart)
+                .safeDrawingPadding()
+                .padding(16.dp)
+                .zIndex(7f)
+                .background(if (locked) StopRed else Color(0xAA0B1622), RoundedCornerShape(14.dp))
+                .border(1.dp, BrandCyan.copy(alpha = 0.4f), RoundedCornerShape(14.dp))
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onTap = { if (!locked) locked = true },
+                        onLongPress = { if (locked) locked = false },
+                    )
+                }
+                .padding(horizontal = 18.dp, vertical = 14.dp),
+        ) {
+            Text(
+                if (locked) "🔒 已锁定 · 长按解锁" else "🔓 锁屏",
+                fontSize = 14.sp,
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+
+        // 锁定态半透明遮罩:拦截地图与仪表盘误触(控制区/锁按钮 zIndex 更高不受影响)
+        if (locked) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .zIndex(5f)
+                    .pointerInput(Unit) { detectTapGestures { } },
+            )
         }
     }
 
