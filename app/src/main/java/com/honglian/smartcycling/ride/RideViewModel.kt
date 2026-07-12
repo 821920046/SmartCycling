@@ -257,8 +257,8 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
                 avgCadenceRpm = s.avgCadenceRpm,
             )
             val id = repository.saveRide(ride, pointsSnapshot)
-            // 自动上传云端中控
-            runCatching {
+            // 自动上传云端中控(仅本地模式下不联网上传)
+            if (!settings.localOnlyMode) runCatching {
                 cloudSync.upload(
                     deviceId = settings.deviceId,
                     rider = settings.riderName,

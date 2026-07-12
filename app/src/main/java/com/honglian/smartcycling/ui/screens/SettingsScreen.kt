@@ -44,12 +44,14 @@ fun SettingsScreen(
     val autoPauseEnabled by viewModel.autoPauseEnabled.collectAsState()
     val autoPauseThreshold by viewModel.autoPauseThresholdKmh.collectAsState()
     val highContrast by viewModel.highContrast.collectAsState()
+    val localOnly by viewModel.localOnly.collectAsState()
 
     var nameInput by remember { mutableStateOf(riderName) }
     var weightInput by remember { mutableStateOf(riderWeight.toInt().toString()) }
     var urlInput by remember { mutableStateOf(cloudSyncUrl) }
     var tokenInput by remember { mutableStateOf(cloudSyncToken) }
     var showWheelDialog by remember { mutableStateOf(false) }
+    var showClearConfirm by remember { mutableStateOf(false) }
 
     // 监听输入，并在失焦或返回时自动更新/保存
     fun saveChanges() {
@@ -354,12 +356,67 @@ fun SettingsScreen(
                             ),
                             modifier = Modifier.fillMaxWidth()
                         )
+
+                        Spacer(Modifier.height(16.dp))
+                        HorizontalDivider(color = DividerNavy)
+                        Spacer(Modifier.height(12.dp))
+                        // 隐私:仅本地模式开关
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text("仅本地模式", color = SpeedText, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                Text("开启后骑行记录只存本机,绝不上传云端", color = DataLabel, fontSize = 12.sp)
+                            }
+                            Switch(
+                                checked = localOnly,
+                                onCheckedChange = { viewModel.updateLocalOnly(it) }
+                            )
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "隐私说明:定位与轨迹仅用于导航和骑行统计,默认只保存在本机;仅当你填写上方服务器地址且未开启“仅本地模式”时才会上传。",
+                            color = DataLabel.copy(alpha = 0.8f),
+                            fontSize = 11.sp
+                        )
+                        Spacer(Modifier.height(16.dp))
+                        // 清空本机全部记录
+                        OutlinedButton(
+                            onClick = { showClearConfirm = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.DeleteForever, contentDescription = null, tint = StopRed)
+                            Spacer(Modifier.width(8.dp))
+                            Text("清空本机全部骑行记录", color = StopRed, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
                 
                 Spacer(Modifier.height(24.dp))
             }
         }
+    }
+
+    if (showClearConfirm) {
+        AlertDialog(
+            onDismissRequest = { showClearConfirm = false },
+            containerColor = CardBg,
+            titleContentColor = SpeedText,
+            textContentColor = DataLabel,
+            title = { Text("清空全部记录?", fontWeight = FontWeight.ExtraBold) },
+            text = { Text("将删除本机所有骑行记录与轨迹点,操作不可撤销。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.clearAllRides()
+                    showClearConfirm = false
+                }) { Text("清空", color = StopRed, fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearConfirm = false }) { Text("取消", color = SpeedText) }
+            },
+        )
     }
 
     if (showWheelDialog) {

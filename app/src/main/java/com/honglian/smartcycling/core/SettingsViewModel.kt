@@ -2,7 +2,9 @@ package com.honglian.smartcycling.core
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
 import com.honglian.smartcycling.SmartCyclingApp
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -41,6 +43,9 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _highContrast = MutableStateFlow(container.settings.highContrast)
     val highContrast: StateFlow<Boolean> = _highContrast.asStateFlow()
+
+    private val _localOnly = MutableStateFlow(container.settings.localOnlyMode)
+    val localOnly: StateFlow<Boolean> = _localOnly.asStateFlow()
 
     fun select(preset: WheelPreset) {
         container.settings.wheelPreset = preset
@@ -88,6 +93,18 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun updateHighContrast(enabled: Boolean) {
         container.settings.highContrast = enabled
         _highContrast.value = enabled
+    }
+
+    fun updateLocalOnly(enabled: Boolean) {
+        container.settings.localOnlyMode = enabled
+        _localOnly.value = enabled
+    }
+
+    /** 清空本机全部骑行记录与轨迹点。 */
+    fun clearAllRides() {
+        viewModelScope.launch {
+            container.rideRepository.clearAll()
+        }
     }
 }
 

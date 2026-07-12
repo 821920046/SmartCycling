@@ -12,4 +12,6 @@ class RideRepository(private val dao: RideDao) {
     suspend fun trackPoints(rideId: Long): List<TrackPointEntity> = dao.trackPoints(rideId)
 
     suspend fun deleteRide(rideId: Long) = dao.deleteRide(rideId)
+
+    suspend fun clearAll() = dao.clearAll()
 }

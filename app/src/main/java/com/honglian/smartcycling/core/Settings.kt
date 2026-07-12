@@ -85,6 +85,11 @@ class Settings(context: Context) {
         get() = prefs.getBoolean(KEY_ONBOARDING, false)
         set(value) { prefs.edit().putBoolean(KEY_ONBOARDING, value).apply() }
 
+    /** 仅本地模式:开启后骑行记录只保存在本机,不上传云端。 */
+    var localOnlyMode: Boolean
+        get() = prefs.getBoolean(KEY_LOCAL_ONLY, false)
+        set(value) { prefs.edit().putBoolean(KEY_LOCAL_ONLY, value).apply() }
+
     companion object {
         private const val KEY_WHEEL = "wheel_preset"
         private const val KEY_DEVICE_ID = "device_id"
@@ -97,6 +102,7 @@ class Settings(context: Context) {
         private const val KEY_AUTO_PAUSE_TH = "auto_pause_threshold"
         private const val KEY_HIGH_CONTRAST = "high_contrast"
         private const val KEY_ONBOARDING = "onboarding_shown"
+        private const val KEY_LOCAL_ONLY = "local_only_mode"
     }
 }
 
