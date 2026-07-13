@@ -50,11 +50,13 @@ class MainActivity : ComponentActivity() {
                         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
                     },
                     onEnterRide = {
-                        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                        // 导航界面跟随手机方向自动横/竖屏(SENSOR:竖放竖屏、横放横屏)
+                        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR
                         startRideService()
                     },
                     onExitRide = {
-                        // 退出骑行回到地图,保持横屏(方便继续换目的地),仅停止前台服务
+                        // 退出骑行回到地图,恢复横屏(地图/目的地输入按横屏设计),并停止前台服务
+                        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
                         stopRideService()
                     },
                 )

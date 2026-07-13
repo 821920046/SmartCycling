@@ -1,5 +1,6 @@
 package com.honglian.smartcycling.ui.screens
 
+import android.content.res.Configuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -32,6 +33,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -56,7 +58,7 @@ import com.honglian.smartcycling.ui.theme.StopRed
 import kotlin.math.roundToInt
 
 /**
- * 骑行中数据界面(横屏):全屏实时地图 + 可自由拖动/缩放的悬浮仪表盘 + 常驻控制按钮。
+ * 骑行中数据界面(横竖屏自适应):全屏实时地图 + 可自由拖动/缩放的悬浮仪表盘 + 常驻控制按钮。
  * - 仪表盘:单指拖动到任意位置、双指捉合缩放、双击复位;位置与缩放跨重建/横竖屏保持。
  * - 控制按钮(暂停/恢复、结束骑行)固定于底部、始终置顶可见,不受仪表盘拖动/自动暂停遮罩影响。
  */
@@ -88,6 +90,10 @@ fun RideScreen(
     var scale by rememberSaveable { mutableStateOf(1f) }
     // 锁屏防误触:锁定后拦截地图/仪表盘触摸,暂停/结束按钮失效,长按锁按钮解锁
     var locked by rememberSaveable { mutableStateOf(false) }
+
+    // 方向自适应:竖屏时收窄悬浮仪表盘,避免遮挡过多地图(横屏用完整宽度)
+    val isPortrait = LocalConfiguration.current.orientation == Configuration.ORIENTATION_PORTRAIT
+    val hudWidth = if (isPortrait) 220.dp else 300.dp
 
     Box(modifier.fillMaxSize().background(Color.Black)) {
         // 1. 底层:全屏实时跟随地图 + 已规划路线
@@ -194,7 +200,7 @@ fun RideScreen(
                     transformOrigin = TransformOrigin(1f, 0.5f) // 以右中为缩放锚点,默认不出屏
                 }
                 .padding(12.dp)
-                .width(300.dp)
+                .width(hudWidth)
                 .background(if (highContrast) Color(0xF3020A12) else Color(0x8804121A), RoundedCornerShape(24.dp))
                 .border(1.dp, BrandCyan.copy(alpha = if (highContrast) 0.9f else 0.5f), RoundedCornerShape(24.dp))
                 .pointerInput(Unit) {
