@@ -278,6 +278,12 @@ private fun HistoryCard(
                         fontWeight = FontWeight.Bold,
                         color = SpeedText
                     )
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        "%.0f kcal · 爬升 %.0f m".format(ride.calories, ride.elevationGainM),
+                        fontSize = 12.sp,
+                        color = DataLabel
+                    )
                 }
             }
             

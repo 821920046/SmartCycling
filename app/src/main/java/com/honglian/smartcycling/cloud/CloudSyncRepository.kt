@@ -43,6 +43,8 @@ class CloudSyncRepository {
                 put("avgSpeedKmh", ride.avgSpeedKmh)
                 put("maxSpeedKmh", ride.maxSpeedKmh)
                 put("avgCadenceRpm", ride.avgCadenceRpm)
+                put("calories", ride.calories)
+                put("elevationGainM", ride.elevationGainM)
                 val arr = JSONArray()
                 points.forEach { p ->
                     arr.put(

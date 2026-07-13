@@ -255,6 +255,8 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
                 avgSpeedKmh = s.avgSpeedKmh,
                 maxSpeedKmh = s.maxSpeedKmh,
                 avgCadenceRpm = s.avgCadenceRpm,
+                calories = s.calories,
+                elevationGainM = s.elevationGainM,
             )
             val id = repository.saveRide(ride, pointsSnapshot)
             // 自动上传云端中控(仅本地模式下不联网上传)

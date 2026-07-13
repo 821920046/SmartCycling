@@ -85,6 +85,9 @@ fun PairingScreen(
         if (result.values.all { it }) onStartScan()
     }
 
+    // 权限使用说明弹窗(先解释用途再申请,符合应用商店合规要求)
+    var showPermRationale by remember { mutableStateOf(false) }
+
     // 仅当蓝牙+定位都开启后才检查权限并开始扫描
     LaunchedEffect(hardwareReady) {
         if (!hardwareReady) return@LaunchedEffect
@@ -92,7 +95,7 @@ fun PairingScreen(
         val granted = perms.all {
             ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
         }
-        if (granted) onStartScan() else permissionLauncher.launch(perms)
+        if (granted) onStartScan() else showPermRationale = true
     }
 
     Box(
@@ -248,6 +251,35 @@ fun PairingScreen(
                 }
             } else {
                 null
+            },
+        )
+    }
+
+    // 权限使用说明:授权前明确告知用途(蓝牙近距离扫描传感器、定位用于导航)
+    if (showPermRationale) {
+        AlertDialog(
+            onDismissRequest = { showPermRationale = false },
+            containerColor = CardBg,
+            titleContentColor = SpeedText,
+            textContentColor = DataLabel,
+            title = { Text("权限使用说明", fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    Text("• 附近设备/蓝牙:扫描并连接迈金 S314 速度踏频传感器,获取精准速度与踏频。", fontSize = 13.sp, lineHeight = 19.sp)
+                    Spacer(Modifier.height(8.dp))
+                    Text("• 位置信息:用于地图导航、路径规划与骑行轨迹记录;低版本系统上蓝牙扫描也依赖定位权限。", fontSize = 13.sp, lineHeight = 19.sp)
+                    Spacer(Modifier.height(8.dp))
+                    Text("以上数据默认仅保存在本机,不用于导航与统计以外的用途。", fontSize = 12.sp, color = BrandCyan, lineHeight = 18.sp)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showPermRationale = false
+                    permissionLauncher.launch(blePermissions())
+                }) { Text("同意并授权", color = BrandCyan, fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPermRationale = false }) { Text("暂不", color = DataLabel) }
             },
         )
     }

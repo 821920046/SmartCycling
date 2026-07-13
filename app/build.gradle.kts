@@ -54,10 +54,11 @@ android {
             signingConfig = signingConfigs.getByName("shared")
         }
         release {
-            // 高德导航 SDK 在 R8 混淆/资源压缩下极易崩溃(调试版导航正常、Release 混淆后闪退)。
-            // 关闭混淆与资源压缩以保证导航稳定;安装包体积主要由 ABI 过滤控制(已去掉 x86)。
-            isMinifyEnabled = false
-            isShrinkResources = false
+            // 重开 R8 代码混淆 + 资源压缩：缩减包体、提升逆向难度。
+            // 高德/Nordic/Room 等反射+JNI 密集库已在 proguard-rules.pro 里用 keep 规则完整保留，
+            // 避免历史上出现过的 Release 混淆闪退。
+            isMinifyEnabled = true
+            isShrinkResources = true
             signingConfig = signingConfigs.getByName("shared")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
