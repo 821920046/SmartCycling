@@ -107,62 +107,66 @@ fun MapScreen(
 
                 // POI 智能联想下拉(仅在无已规划路线时显示,避免遮挡地图预览)
                 if (suggestions.isNotEmpty() && routePoints.isEmpty()) {
-                    Spacer(Modifier.height(4.dp))
-                    Card(
-                        modifier = Modifier
+                    Spacer(Modifier.height(8.dp))
+                    val items = suggestions.take(8)
+                    Column(
+                        Modifier
                             .fillMaxWidth()
-                            .heightIn(max = 220.dp),
-                        shape = RoundedCornerShape(10.dp),
-                        colors = CardDefaults.cardColors(containerColor = GlassBg.copy(alpha = 0.95f)),
+                            .heightIn(max = 268.dp)
+                            .background(Color(0xF20B1622), RoundedCornerShape(12.dp))
+                            .border(1.dp, GlassBorder, RoundedCornerShape(12.dp))
+                            .verticalScroll(rememberScrollState())
+                            .padding(vertical = 4.dp),
                     ) {
-                        Column(
-                            Modifier
-                                .verticalScroll(rememberScrollState())
-                                .padding(4.dp)
-                        ) {
-                            suggestions.take(8).forEach { poi ->
-                                val title = poi.title?.takeIf { it.isNotBlank() } ?: "未知地点"
-                                val address = poi.snippet?.takeIf { it.isNotBlank() }
-                                    ?: poi.cityName ?: ""
-                                Surface(
-                                    onClick = {
+                        items.forEachIndexed { index, poi ->
+                            val title = poi.title?.takeIf { it.isNotBlank() } ?: "未知地点"
+                            val address = poi.snippet?.takeIf { it.isNotBlank() }
+                                ?: poi.cityName ?: ""
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
                                         focus.clearFocus()
                                         onSuggestionSelected(poi)
                                         query = "" // 清空输入框,避免空回填触发竞态联想
-                                    },
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = Color.Transparent,
-                                    modifier = Modifier.fillMaxWidth(),
+                                    }
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Box(
+                                    Modifier
+                                        .size(32.dp)
+                                        .background(BrandCyan.copy(alpha = 0.14f), RoundedCornerShape(9.dp)),
+                                    contentAlignment = Alignment.Center,
                                 ) {
-                                    Row(
-                                        Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 10.dp, vertical = 8.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                    ) {
-                                        Text("📍", fontSize = 14.sp)
-                                        Spacer(Modifier.width(8.dp))
-                                        Column(Modifier.weight(1f)) {
-                                            Text(
-                                                title,
-                                                fontSize = 14.sp,
-                                                fontWeight = FontWeight.Medium,
-                                                color = SpeedText,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                            )
-                                            if (address.isNotBlank()) {
-                                                Text(
-                                                    address,
-                                                    fontSize = 12.sp,
-                                                    color = DataLabel,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis,
-                                                )
-                                            }
-                                        }
+                                    Text("📍", fontSize = 15.sp)
+                                }
+                                Spacer(Modifier.width(10.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(
+                                        title,
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = SpeedText,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    if (address.isNotBlank()) {
+                                        Text(
+                                            address,
+                                            fontSize = 12.sp,
+                                            color = DataLabel,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
                                     }
                                 }
+                            }
+                            if (index < items.lastIndex) {
+                                HorizontalDivider(
+                                    color = DividerNavy.copy(alpha = 0.55f),
+                                    modifier = Modifier.padding(horizontal = 12.dp),
+                                )
                             }
                         }
                     }

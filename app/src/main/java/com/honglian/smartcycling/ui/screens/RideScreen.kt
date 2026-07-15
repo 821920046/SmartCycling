@@ -82,7 +82,7 @@ fun RideScreen(
     if (isPortrait) {
         // ===== 竖屏：上地图 + 下停靠仪表盘 =====
         Column(modifier.fillMaxSize().background(Color.Black)) {
-            Box(Modifier.weight(0.56f).fillMaxWidth()) {
+            Box(Modifier.weight(0.54f).fillMaxWidth()) {
                 NavigationMapView(
                     modifier = Modifier.fillMaxSize(),
                     routePoints = liveRoute,
@@ -130,7 +130,7 @@ fun RideScreen(
                 }
             }
             PortraitDashboard(
-                modifier = Modifier.weight(0.44f),
+                modifier = Modifier.weight(0.46f),
                 state = state,
                 locked = locked,
                 highContrast = highContrast,
@@ -351,63 +351,72 @@ private fun PortraitDashboard(
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         modifier = modifier.fillMaxWidth(),
     ) {
-        Column(
-            Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .safeDrawingPadding()
-                .padding(horizontal = 18.dp)
-                .padding(top = 12.dp, bottom = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
+        Column(Modifier.fillMaxSize()) {
             // 顶部拖柄
             Box(
                 Modifier
                     .align(Alignment.CenterHorizontally)
+                    .padding(top = 10.dp)
                     .width(44.dp)
                     .height(5.dp)
                     .background(Color(0x33FFFFFF), RoundedCornerShape(3.dp)),
             )
-            // Hero: 速度环 + 状态 + 时长/里程
-            Row(
-                Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(18.dp),
+            // 可滚动统计区：占据除按钮外的剩余高度，内容超出时可滚动，绝不挤占底部按钮。
+            Column(
+                Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 18.dp)
+                    .padding(top = 12.dp, bottom = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                SpeedRing(
-                    value = if (cadenceMode) state.cadenceRpm else state.speedKmh,
-                    unit = if (cadenceMode) "rpm" else "km/h",
-                    maxValue = if (cadenceMode) 120.0 else 60.0,
-                    diameterDp = 116,
-                )
-                Column(
-                    Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                // Hero: 速度环 + 状态 + 时长/里程
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(18.dp),
                 ) {
-                    StatusPill(text = speedSourceLabel(state, cadenceMode), paused = state.isPaused)
-                    HeroStat(icon = "⏱", label = "骑行时长", value = state.durationText, accent = BrandCyan)
-                    HeroStat(icon = "🏁", label = "骑行路程", value = "%.2f km".format(state.distanceKm), accent = BrandGreen)
+                    SpeedRing(
+                        value = if (cadenceMode) state.cadenceRpm else state.speedKmh,
+                        unit = if (cadenceMode) "rpm" else "km/h",
+                        maxValue = if (cadenceMode) 120.0 else 60.0,
+                        diameterDp = 120,
+                    )
+                    Column(
+                        Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        StatusPill(text = speedSourceLabel(state, cadenceMode), paused = state.isPaused)
+                        HeroStat(icon = "⏱", label = "骑行时长", value = state.durationText, accent = BrandCyan)
+                        HeroStat(icon = "🏁", label = "骑行路程", value = "%.2f km".format(state.distanceKm), accent = BrandGreen)
+                    }
+                }
+                // 指标卡片 2×2
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    StatChip(Modifier.weight(1f), "均速", "%.1f".format(state.avgSpeedKmh), "km/h", BrandCyan, highContrast)
+                    StatChip(
+                        Modifier.weight(1f),
+                        if (cadenceMode) "平均踏频" else "踏频",
+                        if (cadenceMode) "${state.avgCadenceRpm.roundToInt()}" else "0",
+                        "rpm",
+                        BrandGreen,
+                        highContrast,
+                    )
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    StatChip(Modifier.weight(1f), "消耗热量", "%.0f".format(state.calories), "kcal", PauseOrange, highContrast)
+                    StatChip(Modifier.weight(1f), "累计爬升", "%.0f".format(state.elevationGainM), "m", SpeedText, highContrast)
                 }
             }
-            // 指标卡片 2×2
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                StatChip(Modifier.weight(1f), "均速", "%.1f".format(state.avgSpeedKmh), "km/h", BrandCyan, highContrast)
-                StatChip(
-                    Modifier.weight(1f),
-                    if (cadenceMode) "平均踏频" else "踏频",
-                    if (cadenceMode) "${state.avgCadenceRpm.roundToInt()}" else "0",
-                    "rpm",
-                    BrandGreen,
-                    highContrast,
-                )
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                StatChip(Modifier.weight(1f), "消耗热量", "%.0f".format(state.calories), "kcal", PauseOrange, highContrast)
-                StatChip(Modifier.weight(1f), "累计爬升", "%.0f".format(state.elevationGainM), "m", SpeedText, highContrast)
-            }
-            // 控制按钮: 锁屏 / 暂停 / 结束
+            // 常驻控制按钮：固定在面板底部，navigationBarsPadding 避开系统手势条，始终可点。
             Row(
-                Modifier.fillMaxWidth(),
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp)
+                    .padding(top = 6.dp)
+                    .navigationBarsPadding()
+                    .padding(bottom = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {

@@ -58,7 +58,8 @@ fun NavigationMapView(
         // 提供外部定位(followLocation)时不启用高德内置定位图层,改由外部定位驱动。
         if (showMyLocation && followLocation == null) {
             val type = when {
-                follow -> MyLocationStyle.LOCATION_TYPE_FOLLOW
+                // 导航模式：定位箭头随设备朝向旋转（罗盘）并保持居中。
+                follow -> MyLocationStyle.LOCATION_TYPE_LOCATION_ROTATE
                 // 预览且尚无路线/目的地:定位并将镜头居中到当前位置
                 routePoints.isEmpty() && destination == null -> MyLocationStyle.LOCATION_TYPE_LOCATE
                 else -> MyLocationStyle.LOCATION_TYPE_SHOW

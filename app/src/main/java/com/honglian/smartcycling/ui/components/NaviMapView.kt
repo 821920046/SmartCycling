@@ -52,7 +52,18 @@ fun NaviVoiceGuide(
         engine = runCatching {
             TextToSpeech(context.applicationContext) { status ->
                 if (status == TextToSpeech.SUCCESS) {
-                    runCatching { engine?.language = Locale.CHINESE }
+                    runCatching {
+                        // 依次尝试多个中文 Locale，任一可用即采用；均不可用则回退系统默认（尽力播报）。
+                        val locales = listOf(Locale.SIMPLIFIED_CHINESE, Locale.CHINA, Locale.CHINESE)
+                        val ok = locales.firstOrNull { lc ->
+                            val r = engine?.setLanguage(lc)
+                            r == TextToSpeech.LANG_AVAILABLE ||
+                                r == TextToSpeech.LANG_COUNTRY_AVAILABLE ||
+                                r == TextToSpeech.LANG_COUNTRY_VAR_AVAILABLE
+                        }
+                        if (ok == null) engine?.setLanguage(Locale.getDefault())
+                        engine?.setSpeechRate(1.0f)
+                    }
                     ttsReady.value = true
                 }
             }
@@ -89,7 +100,8 @@ fun NaviVoiceGuide(
                 val info = computeGuidance(routeState.value, here, destState.value)
                 onNaviInfoState.value.invoke(info)
 
-                if (!announcedStart) {
+                // 等 TTS 就绪再播报起步，避免初始化未完成时白白丢掉首播。
+                if (!announcedStart && ttsReady.value) {
                     speak("开始骑行导航，全程约 %.1f 公里".format(info.routeRemainMeters / 1000.0))
                     announcedStart = true
                 }
