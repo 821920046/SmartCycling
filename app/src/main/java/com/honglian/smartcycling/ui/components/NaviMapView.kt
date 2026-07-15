@@ -1,160 +1,118 @@
 package com.honglian.smartcycling.ui.components
 
 import android.location.Location
-import android.os.Handler
-import android.os.Looper
+import android.speech.tts.TextToSpeech
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.LocalContext
 import com.amap.api.maps.model.LatLng
-import com.amap.api.navi.AMapNavi
-import com.amap.api.navi.SimpleNaviListener
-import com.amap.api.navi.enums.NaviType
-import com.amap.api.navi.model.AMapCalcRouteResult
-import com.amap.api.navi.model.NaviInfo
-import com.amap.api.navi.model.NaviLatLng
 import kotlinx.coroutines.delay
+import java.util.Locale
+import kotlin.math.abs
 
 /**
- * 无界面(headless)turn-by-turn 语音诱导。
+ * turn-by-turn 语音诱导（纯框架实现，零原生导航引擎）。
  *
- * 第一性原则重构背景:
- * 旧方案 NaviMapView 基于 AMapNaviView + startNavi(NaviType.GPS),靠导航引擎自己的内部
- * 定位器驱动镜头与车标,但从未向引擎喂定位(无 setExtraGPSData),
- * 也完全忽略了 App 自己的真实定位 → 引擎内部定位器无定位,镜头停在高德默认中心(北京)。
+ * 第一性原则重构背景：
+ * 旧方案基于高德导航引擎 AMapNavi（getInstance/startNavi/内置TTS），该引擎是 native(C/C++) 密集组件，
+ * 其 native 崩溃会绕过所有 Java 层 runCatching 与全局 CrashHandler，直接杀进程回桌面且不留 Java 日志——
+ * 这正是“点击开始骑行直接闪退到桌面、无崩溃弹窗”的病根。
  *
- * 现将“可见地图”交给可靠的 NavigationMapView(TextureMapView + 高德自带实时跟随),
- * 本组件仅保留“语音”职责:
- * - 不创建任何 AMapNaviView(无界面),彻底规避镜头停北京的问题。
- * - 用 AMapNavi 引擎算路 + 内置语音播报,并用 App 真实定位(GCJ-02)持续喂给引擎。
- * - 全程 runCatching 兢底:任何失败都只影响语音,绝不影响地图或导致闪退。
+ * 现彻底移除 AMapNavi：
+ * - 可见地图/路线/跟随仍由 NavigationMapView(地图 SDK) 负责，稳定可靠。
+ * - 转向卡与里程/ETA 由“已规划路线折线 + App 真实定位”做纯几何推算得出。
+ * - 语音走系统 TextToSpeech（中文），与任何第三方 native 库无关。
+ * - 全程 runCatching 兜底：任何异常只影响语音提示，绝不影响地图或导致闪退。
  */
 @Composable
 fun NaviVoiceGuide(
     destination: LatLng,
     startPoint: LatLng?,
     currentLatLng: LatLng?,
+    routePoints: List<LatLng> = emptyList(),
     enabled: Boolean,
     onNaviInfo: (NaviBannerInfo?) -> Unit = {},
     onRoutePath: (List<LatLng>) -> Unit = {},
 ) {
     val context = LocalContext.current
-    val appContext = context.applicationContext
-    val navi = remember { runCatching { AMapNavi.getInstance(appContext) }.getOrNull() }
-    val destState = rememberUpdatedState(destination)
-    val startState = rememberUpdatedState(startPoint)
+    val enabledState = rememberUpdatedState(enabled)
+    val routeState = rememberUpdatedState(routePoints)
     val locState = rememberUpdatedState(currentLatLng)
+    val destState = rememberUpdatedState(destination)
     val onNaviInfoState = rememberUpdatedState(onNaviInfo)
-    val onRoutePathState = rememberUpdatedState(onRoutePath)
-    // 引擎回调在导航线程触发,统一切回主线程再更新 Compose 状态。
-    val mainHandler = remember { Handler(Looper.getMainLooper()) }
 
-    DisposableEffect(navi) {
-        val n = navi
-        var listener: SimpleNaviListener? = null
-        if (n != null) {
-            runCatching { n.setUseInnerVoice(enabled, false) }
-            // 必须在 startNavi 之前开启外部 GPS 喂数
-            runCatching { n.setIsUseExtraGPSData(true) }
-            var naviStarted = false
-            val l = object : SimpleNaviListener() {
-                override fun onInitNaviSuccess() {
-                    requestRoute(n, startState.value, destState.value)
-                }
-
-                override fun onCalculateRouteSuccess(result: AMapCalcRouteResult?) {
-                    // 首次算路成功才 startNavi;偏航重算的后续成功不重复启动(引擎自动续航)。
-                    if (!naviStarted) {
-                        runCatching { n.startNavi(NaviType.GPS) }
-                        naviStarted = true
-                    }
-                    // 把引擎算出的真实路线上抛,驱动可见地图重绘(支持偏航重算后路线更新)。
-                    runCatching {
-                        val path = n.naviPath?.coordList?.map { LatLng(it.latitude, it.longitude) }
-                        if (!path.isNullOrEmpty()) mainHandler.post { onRoutePathState.value(path) }
-                    }
-                }
-
-                // 偏航:引擎会自动重新算路,onCalculateRouteSuccess 会带来新路线并重绘,无需手动干预。
-                override fun onReCalculateRouteForYaw() {}
-
-                override fun onNaviInfoUpdate(info: NaviInfo?) {
-                    val banner = if (info == null) null else runCatching {
-                        NaviBannerInfo(
-                            iconType = info.iconType,
-                            nextRoad = info.nextRoadName ?: "",
-                            segRemainMeters = info.curStepRetainDistance,
-                            routeRemainMeters = info.pathRetainDistance,
-                            routeRemainSeconds = info.pathRetainTime,
-                        )
-                    }.getOrNull()
-                    mainHandler.post { onNaviInfoState.value(banner) }
-                }
-
-                override fun onArriveDestination() {
-                    mainHandler.post { onNaviInfoState.value(null) }
+    val ttsReady = remember { mutableStateOf(false) }
+    // 系统 TextToSpeech（中文）。构造与语言设置全部兜底，初始化失败仅静音、不影响导航。
+    val tts = remember {
+        var engine: TextToSpeech? = null
+        engine = runCatching {
+            TextToSpeech(context.applicationContext) { status ->
+                if (status == TextToSpeech.SUCCESS) {
+                    runCatching { engine?.language = Locale.CHINESE }
+                    ttsReady.value = true
                 }
             }
-            runCatching { n.addAMapNaviListener(l) }
-            listener = l
-        }
+        }.getOrNull()
+        engine
+    }
+
+    DisposableEffect(Unit) {
         onDispose {
-            val l = listener
-            if (n != null && l != null) {
-                runCatching { n.stopNavi() }
-                runCatching { n.removeAMapNaviListener(l) }
-            }
-            runCatching { AMapNavi.destroy() }
+            runCatching { tts?.stop() }
+            runCatching { tts?.shutdown() }
         }
     }
 
-    // 兢底:若监听器注册时引擎已初始化完毕(onInitNaviSuccess 不再重发),延时主动算一次路。
-    LaunchedEffect(navi) {
-        val n = navi ?: return@LaunchedEffect
-        delay(1500)
-        requestRoute(n, startState.value, destState.value)
+    // 语音关闭时立即静音
+    LaunchedEffect(enabled) {
+        if (!enabled) runCatching { tts?.stop() }
     }
 
-    // 语音开关实时切换
-    LaunchedEffect(enabled, navi) {
-        runCatching { navi?.setUseInnerVoice(enabled, false) }
-    }
+    // 主循环：每秒推算进度/转向并驱动转向卡与语音里程碑。
+    LaunchedEffect(Unit) {
+        fun speak(text: String) {
+            if (!enabledState.value || !ttsReady.value) return
+            runCatching { tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "nav") }
+        }
 
-    // 用 App 真实定位(GCJ-02)持续喂给导航引擎,让语音基于真实位置播报。
-    LaunchedEffect(navi) {
-        val n = navi ?: return@LaunchedEffect
-        var prev: Location? = null
+        var announcedStart = false
+        var announcedArrive = false
+        var turnArmed = true
+
         while (true) {
-            val cur = locState.value
-            if (cur != null) {
-                val loc = Location("gps").apply {
-                    latitude = cur.latitude
-                    longitude = cur.longitude
-                    accuracy = 5f
-                    time = System.currentTimeMillis()
-                    val p = prev
-                    if (p != null) {
-                        val d = p.distanceTo(this)
-                        if (d >= 0.8f) {
-                            bearing = p.bearingTo(this)
-                            speed = d / 0.8f
-                        } else {
-                            bearing = p.bearing
-                        }
-                    }
+            val here = locState.value
+            if (here != null) {
+                val info = computeGuidance(routeState.value, here, destState.value)
+                onNaviInfoState.value.invoke(info)
+
+                if (!announcedStart) {
+                    speak("开始骑行导航，全程约 %.1f 公里".format(info.routeRemainMeters / 1000.0))
+                    announcedStart = true
                 }
-                runCatching { n.setExtraGPSData(2, loc) } // 2 = GCJ-02
-                prev = loc
+                // 转向播报：接近转向点（<120m）时播报一次，转向点远离后重新武装
+                if (info.iconType != 1 && info.segRemainMeters in 1..120 && turnArmed) {
+                    val dir = if (info.iconType == 2) "左转" else "右转"
+                    speak("前方 %d 米%s".format(info.segRemainMeters, dir))
+                    turnArmed = false
+                } else if (info.iconType == 1 || info.segRemainMeters > 200) {
+                    turnArmed = true
+                }
+                // 到达播报
+                if (!announcedArrive && info.routeRemainMeters <= 50) {
+                    speak("即将到达目的地")
+                    announcedArrive = true
+                }
             }
-            delay(800)
+            delay(1000)
         }
     }
 }
 
-/** turn-by-turn 转向卡数据(从 AMap 导航引擎的实时 NaviInfo 提炼)。 */
+/** turn-by-turn 转向卡数据（由路线几何推算）。 */
 data class NaviBannerInfo(
     val iconType: Int,
     val nextRoad: String,
@@ -163,16 +121,69 @@ data class NaviBannerInfo(
     val routeRemainSeconds: Int,
 )
 
-/** 发起骑行算路(有真实起点则用起点，否则由引擎自定位起点)。 */
-private fun requestRoute(navi: AMapNavi, start: LatLng?, dest: LatLng) {
-    runCatching {
-        if (start != null) {
-            navi.calculateRideRoute(
-                NaviLatLng(start.latitude, start.longitude),
-                NaviLatLng(dest.latitude, dest.longitude),
-            )
-        } else {
-            navi.calculateRideRoute(NaviLatLng(dest.latitude, dest.longitude))
+/**
+ * 基于规划路线折线 + 当前位置推算导航信息：
+ * - routeRemainMeters：沿路线到终点的剩余距离。
+ * - iconType/segRemainMeters：前方最近一次明显转向（>=25°）的方向与距离；无转向则直行。
+ * - routeRemainSeconds：按约 15km/h 估算的剩余时间。
+ */
+private fun computeGuidance(route: List<LatLng>, here: LatLng, dest: LatLng): NaviBannerInfo {
+    if (route.size < 2) {
+        val d = distMeters(here, dest).toInt()
+        return NaviBannerInfo(1, "", d, d, estSeconds(d))
+    }
+    // 最近折线顶点
+    var ni = 0
+    var best = Double.MAX_VALUE
+    for (i in route.indices) {
+        val dd = distMeters(here, route[i])
+        if (dd < best) {
+            best = dd
+            ni = i
         }
     }
+    // 沿路线剩余距离
+    var remaining = distMeters(here, route[ni])
+    for (i in ni until route.size - 1) remaining += distMeters(route[i], route[i + 1])
+    // 前方最近转向检测（500m 前瞻）
+    var acc = distMeters(here, route[ni])
+    var turnType = 1
+    var segRemain = remaining.toInt()
+    var found = false
+    var i = ni
+    while (i < route.size - 2 && acc <= 500.0) {
+        val inB = bearingDeg(route[i], route[i + 1])
+        val outB = bearingDeg(route[i + 1], route[i + 2])
+        var delta = outB - inB
+        while (delta > 180) delta -= 360
+        while (delta < -180) delta += 360
+        acc += distMeters(route[i], route[i + 1])
+        if (abs(delta) >= 25.0) {
+            turnType = if (delta > 0) 3 else 2 // 顺时针(正)=右转, 逆时针(负)=左转
+            segRemain = acc.toInt()
+            found = true
+            break
+        }
+        i++
+    }
+    if (!found) {
+        turnType = 1
+        segRemain = remaining.toInt()
+    }
+    return NaviBannerInfo(turnType, "", segRemain, remaining.toInt(), estSeconds(remaining.toInt()))
 }
+
+private fun distMeters(a: LatLng, b: LatLng): Double {
+    val r = FloatArray(2)
+    Location.distanceBetween(a.latitude, a.longitude, b.latitude, b.longitude, r)
+    return r[0].toDouble()
+}
+
+private fun bearingDeg(a: LatLng, b: LatLng): Double {
+    val r = FloatArray(2)
+    Location.distanceBetween(a.latitude, a.longitude, b.latitude, b.longitude, r)
+    return r[1].toDouble()
+}
+
+/** 剩余时间估算：约 15km/h ≈ 4.2 m/s。 */
+private fun estSeconds(meters: Int): Int = (meters / 4.2).toInt()
