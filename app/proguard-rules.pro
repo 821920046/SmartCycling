@@ -58,6 +58,14 @@
 -keep class com.honglian.smartcycling.ride.RideState { *; }
 -keep class com.honglian.smartcycling.BuildConfig { *; }
 
+# =================== Lifecycle / ViewModel ===================
+# ViewModelProvider 通过反射调用 (Application) 构造器实例化 ViewModel;
+# Release 混淆下若构造器被裁剪/优化，viewModel() 会抛异常导致进入界面即闪退。
+-keep class * extends androidx.lifecycle.ViewModel { <init>(...); }
+-keep class * extends androidx.lifecycle.AndroidViewModel { <init>(...); }
+-keepclassmembers class * extends androidx.lifecycle.ViewModel { <init>(...); }
+-keepclassmembers class * extends androidx.lifecycle.AndroidViewModel { <init>(...); }
+
 # =================== Nordic BLE ===================
 -keep class no.nordicsemi.android.ble.** { *; }
 -keep class no.nordicsemi.android.support.v18.scanner.** { *; }

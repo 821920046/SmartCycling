@@ -8,6 +8,7 @@ import com.honglian.smartcycling.SmartCyclingApp
 import com.honglian.smartcycling.data.RideEntity
 import com.honglian.smartcycling.data.TrackPointEntity
 import com.honglian.smartcycling.location.LocationSample
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -94,9 +95,11 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
         _state.value = RideState(isRiding = true, isPaused = false)
 
         rideJob = viewModelScope.launch {
-            launch { collectSensor() }
-            launch { collectLocation() }
-            launch { ticker() }
+            // 采集协程兜底：任一数据源(传感器/GPS/计时)抛异常都只在本协程内消化，
+            // 绝不冒泡到 viewModelScope 触发未捕获异常导致整个 App 闪退。
+            launch { try { collectSensor() } catch (c: CancellationException) { throw c } catch (t: Throwable) {} }
+            launch { try { collectLocation() } catch (c: CancellationException) { throw c } catch (t: Throwable) {} }
+            launch { try { ticker() } catch (c: CancellationException) { throw c } catch (t: Throwable) {} }
         }
     }
 
