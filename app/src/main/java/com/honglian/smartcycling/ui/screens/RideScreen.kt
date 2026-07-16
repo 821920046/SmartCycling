@@ -373,12 +373,15 @@ private fun PortraitDashboard(
     val gap = if (compact) 7.dp else 10.dp
 
     Surface(
-        color = if (highContrast) Color(0xFF020A12) else Color(0xFF0A1622),
+        // 半透明玻璃 HUD：地图仍可透出，同时用描边和高对比文字保证骑行中一眼可读。
+        color = if (highContrast) Color(0xD9020A12) else Color(0x66071420),
         contentColor = Color.White,
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(22.dp),
+        modifier = modifier.fillMaxWidth()
+            .border(1.dp, BrandCyan.copy(alpha = 0.70f), RoundedCornerShape(22.dp)),
     ) {
-        Column(Modifier.fillMaxSize()) {
+        // 关键：使用内容高度，不再 fillMaxSize 占满父级，杜绝底部黑色空白。
+        Column(Modifier.fillMaxWidth().wrapContentHeight()) {
             Box(
                 Modifier.align(Alignment.CenterHorizontally).padding(top = 7.dp)
                     .width(38.dp).height(4.dp)
@@ -410,10 +413,6 @@ private fun PortraitDashboard(
                     AdaptiveStatChip(Modifier.weight(1f), "均速", "%.1f".format(state.avgSpeedKmh), "km/h", BrandCyan, highContrast, cardHeight, compact)
                     AdaptiveStatChip(Modifier.weight(1f), if (cadenceMode) "平均踏频" else "踏频", if (cadenceMode) "${state.avgCadenceRpm.roundToInt()}" else "0", "rpm", BrandGreen, highContrast, cardHeight, compact)
                 }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(gap)) {
-                    AdaptiveStatChip(Modifier.weight(1f), "消耗热量", "%.0f".format(state.calories), "kcal", PauseOrange, highContrast, cardHeight, compact)
-                    AdaptiveStatChip(Modifier.weight(1f), "累计爬升", "%.0f".format(state.elevationGainM), "m", SpeedText, highContrast, cardHeight, compact)
-                }
             }
             // 固定操作栏在安全区内：不参与滚动、不被手势条或统计卡片覆盖。
             Row(
@@ -444,20 +443,20 @@ private fun PortraitDashboard(
 private fun CompactHeroStat(icon: String, label: String, value: String, accent: Color, compact: Boolean) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
         Text(icon, fontSize = if (compact) 13.sp else 15.sp)
-        Text(value, fontSize = if (compact) 18.sp else 20.sp, fontWeight = FontWeight.ExtraBold, color = accent, maxLines = 1)
-        Text(label, fontSize = if (compact) 10.sp else 11.sp, color = DataLabel, maxLines = 1)
+        Text(value, fontSize = if (compact) 18.sp else 20.sp, fontWeight = FontWeight.Black, color = Color.White, maxLines = 1)
+        Text(label, fontSize = if (compact) 10.sp else 11.sp, color = Color(0xFFBCEFFF), fontWeight = FontWeight.Bold, maxLines = 1)
     }
 }
 
 @Composable
 private fun AdaptiveStatChip(modifier: Modifier, label: String, value: String, unit: String, accent: Color, highContrast: Boolean, height: androidx.compose.ui.unit.Dp, compact: Boolean) {
-    Row(modifier.height(height).background(if (highContrast) Color(0x33FFFFFF) else Color(0x14FFFFFF), RoundedCornerShape(13.dp)).border(1.dp, GlassBorder, RoundedCornerShape(13.dp)), verticalAlignment = Alignment.CenterVertically) {
+    Row(modifier.height(height).background(if (highContrast) Color(0x66FFFFFF) else Color(0x3D061C2B), RoundedCornerShape(13.dp)).border(1.dp, accent.copy(alpha = 0.72f), RoundedCornerShape(13.dp)), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.padding(start = if (compact) 7.dp else 9.dp).width(3.dp).height(if (compact) 25.dp else 29.dp).background(accent, RoundedCornerShape(2.dp)))
         Column(Modifier.padding(horizontal = if (compact) 8.dp else 10.dp)) {
-            Text(label, fontSize = if (compact) 9.sp else 10.sp, color = DataLabel, maxLines = 1)
+            Text(label, fontSize = if (compact) 10.sp else 11.sp, color = Color(0xFFE2F7FF), fontWeight = FontWeight.Bold, maxLines = 1)
             Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(value, fontSize = if (compact) 16.sp else 18.sp, fontWeight = FontWeight.ExtraBold, color = SpeedText, maxLines = 1)
-                Text(unit, fontSize = if (compact) 9.sp else 10.sp, color = DataLabel, modifier = Modifier.padding(bottom = 2.dp), maxLines = 1)
+                Text(value, fontSize = if (compact) 18.sp else 20.sp, fontWeight = FontWeight.Black, color = Color.White, maxLines = 1)
+                Text(unit, fontSize = if (compact) 10.sp else 11.sp, color = Color(0xFFBCEFFF), fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 2.dp), maxLines = 1)
             }
         }
     }
@@ -469,11 +468,11 @@ private fun StatusPill(text: String, paused: Boolean) {
     val c = if (paused) PauseOrange else BrandCyan
     Box(
         Modifier
-            .background(c.copy(alpha = 0.16f), RoundedCornerShape(50))
-            .border(1.dp, c.copy(alpha = 0.5f), RoundedCornerShape(50))
+            .background(c.copy(alpha = 0.28f), RoundedCornerShape(50))
+            .border(1.dp, c.copy(alpha = 0.85f), RoundedCornerShape(50))
             .padding(horizontal = 12.dp, vertical = 5.dp),
     ) {
-        Text(text, fontSize = 12.sp, color = c, fontWeight = FontWeight.Bold)
+        Text(text, fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.ExtraBold)
     }
 }
 
