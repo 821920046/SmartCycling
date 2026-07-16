@@ -46,7 +46,8 @@ import kotlin.math.roundToInt
 /**
  * 骑行中数据界面（横竖屏自适应）：
  * - 横屏：全屏地图 + 可自由拖动/缩放的右侧悬浮仪表盘（保留原设计）。
- * - 竖屏：上方地图 + 下方停靠式仪表盘（大速度环 + 时长/里程 + 2×3 数据网格 + 控制按钮）。
+ * - 竖屏：全屏地图 + 底部可拖动、双指缩放、双击复位的悬浮仪表盘。
+ * - 横屏：全屏地图 + 右侧可拖动、双指缩放、双击复位的悬浮仪表盘。
  * - 控制按钮（暂停/恢复、结束骑行、锁屏）在两种方向下均常驻可见。
  */
 @Composable
@@ -76,72 +77,87 @@ fun RideScreen(
     var offsetX by rememberSaveable { mutableStateOf(0f) }
     var offsetY by rememberSaveable { mutableStateOf(0f) }
     var scale by rememberSaveable { mutableStateOf(1f) }
+    // 竖屏悬浮仪表盘：可拖动、可缩放，且在屏幕旋转后保留位置与缩放比例。
+    var portraitOffsetX by rememberSaveable { mutableStateOf(0f) }
+    var portraitOffsetY by rememberSaveable { mutableStateOf(0f) }
+    var portraitScale by rememberSaveable { mutableStateOf(1f) }
 
     val configuration = LocalConfiguration.current
     val isPortrait = configuration.orientation == Configuration.ORIENTATION_PORTRAIT
-    // 小屏/分屏时优先保证仪表盘与所有控制功能完整可见。
-    val compactPortrait = configuration.screenHeightDp < 760
-
     if (isPortrait) {
-        // ===== 竖屏：上地图 + 下停靠仪表盘 =====
-        Column(modifier.fillMaxSize().background(Color.Black)) {
-            Box(Modifier.weight(if (compactPortrait) 0.42f else 0.48f).fillMaxWidth()) {
-                NavigationMapView(
-                    modifier = Modifier.fillMaxSize(),
-                    routePoints = liveRoute,
-                    traveledPoints = traveledPoints,
+        // ===== 竖屏：全屏地图 + 可缩放悬浮仪表盘 =====
+        // 地图始终铺满全屏；仪表盘只是一层 HUD，不再占据底部布局高度或制造黑色空白。
+        Box(modifier.fillMaxSize().background(Color.Black)) {
+            NavigationMapView(
+                modifier = Modifier.fillMaxSize(),
+                routePoints = liveRoute,
+                traveledPoints = traveledPoints,
+                destination = destination,
+                follow = true,
+                mapType = 3,
+            )
+            if (destination != null) {
+                NaviVoiceGuide(
                     destination = destination,
-                    follow = true,
-                    mapType = 3,
+                    startPoint = startPoint,
+                    currentLatLng = currentLatLng,
+                    routePoints = liveRoute,
+                    enabled = voiceEnabled,
+                    onNaviInfo = { naviInfo = it },
+                    onRoutePath = { path -> if (path.isNotEmpty()) liveRoute = path },
                 )
-                if (destination != null) {
-                    NaviVoiceGuide(
-                        destination = destination,
-                        startPoint = startPoint,
-                        currentLatLng = currentLatLng,
-                        routePoints = liveRoute,
-                        enabled = voiceEnabled,
-                        onNaviInfo = { naviInfo = it },
-                        onRoutePath = { path -> if (path.isNotEmpty()) liveRoute = path },
-                    )
-                    VoiceToggleButton(
-                        voiceEnabled = voiceEnabled,
-                        onToggleVoice = onToggleVoice,
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .safeDrawingPadding()
-                            .padding(12.dp),
-                    )
-                    naviInfo?.let { info ->
-                        TurnBanner(
-                            info = info,
-                            modifier = Modifier
-                                .align(Alignment.TopCenter)
-                                .safeDrawingPadding()
-                                .padding(top = 10.dp, start = 8.dp, end = 8.dp)
-                                .widthIn(max = 460.dp),
-                        )
-                    }
-                }
-                // 锁定时遮罩地图（仅拦截地图触摸，下方仪表盘/按钮不受影响）
-                if (locked) {
-                    Box(
-                        Modifier
-                            .fillMaxSize()
-                            .pointerInput(Unit) { detectTapGestures { } },
+                VoiceToggleButton(
+                    voiceEnabled = voiceEnabled,
+                    onToggleVoice = onToggleVoice,
+                    modifier = Modifier.align(Alignment.TopStart).safeDrawingPadding().padding(12.dp).zIndex(4f),
+                )
+                naviInfo?.let { info ->
+                    TurnBanner(
+                        info = info,
+                        modifier = Modifier.align(Alignment.TopCenter).safeDrawingPadding()
+                            .padding(top = 10.dp, start = 8.dp, end = 8.dp).widthIn(max = 460.dp).zIndex(5f),
                     )
                 }
             }
-            PortraitDashboard(
-                modifier = Modifier.weight(if (compactPortrait) 0.58f else 0.52f),
-                state = state,
-                locked = locked,
-                highContrast = highContrast,
-                onTogglePause = { if (!locked) onTogglePause() },
-                onStopRequest = { if (!locked) showStopConfirm = true },
-                onLock = { locked = true },
-                onUnlock = { locked = false },
-            )
+            // 底部悬浮 HUD：单指拖动，双指缩放，双击复位；始终覆盖地图而非挤压地图。
+            Box(
+                Modifier.align(Alignment.BottomCenter).safeDrawingPadding().padding(horizontal = 10.dp, vertical = 10.dp)
+                    .offset { IntOffset(portraitOffsetX.roundToInt(), portraitOffsetY.roundToInt()) }
+                    .graphicsLayer {
+                        scaleX = portraitScale
+                        scaleY = portraitScale
+                        transformOrigin = TransformOrigin(0.5f, 1f)
+                    }
+                    .widthIn(max = 380.dp).fillMaxWidth(0.96f)
+                    .zIndex(8f)
+                    .pointerInput(Unit) {
+                        detectTransformGestures { _, pan, zoom, _ ->
+                            portraitOffsetX += pan.x
+                            portraitOffsetY += pan.y
+                            portraitScale = (portraitScale * zoom).coerceIn(0.58f, 1.15f)
+                        }
+                    }
+                    .pointerInput(Unit) {
+                        detectTapGestures(onDoubleTap = {
+                            portraitOffsetX = 0f
+                            portraitOffsetY = 0f
+                            portraitScale = 1f
+                        })
+                    },
+            ) {
+                PortraitDashboard(
+                    state = state,
+                    locked = locked,
+                    highContrast = highContrast,
+                    onTogglePause = { if (!locked) onTogglePause() },
+                    onStopRequest = { if (!locked) showStopConfirm = true },
+                    onLock = { locked = true },
+                    onUnlock = { locked = false },
+                )
+            }
+            if (locked) {
+                Box(Modifier.fillMaxSize().zIndex(7f).pointerInput(Unit) { detectTapGestures { } })
+            }
         }
     } else {
         // ===== 横屏：全屏地图 + 右侧可拖动缩放悬浮仪表盘（原设计） =====
@@ -201,7 +217,8 @@ fun RideScreen(
                         transformOrigin = TransformOrigin(1f, 0.5f)
                     }
                     .padding(12.dp)
-                    .width(300.dp)
+                    .widthIn(max = 300.dp)
+                    .width(264.dp)
                     .background(if (highContrast) Color(0xF3020A12) else Color(0x8804121A), RoundedCornerShape(24.dp))
                     .border(1.dp, BrandCyan.copy(alpha = if (highContrast) 0.9f else 0.5f), RoundedCornerShape(24.dp))
                     .pointerInput(Unit) {
@@ -224,7 +241,7 @@ fun RideScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
-                    "✥ 拖动 · 双指缩放 · 双击复位",
+                    "✥ 悬浮仪表 · 拖动 · 双指缩放 · 双击复位",
                     fontSize = 10.sp,
                     color = DataLabel,
                     fontWeight = FontWeight.Medium,
@@ -369,7 +386,7 @@ private fun PortraitDashboard(
             )
             // 这里不再使用会把内容滚到按钮下方的滚动容器；所有核心数据在一屏内自适应缩放。
             Column(
-                Modifier.weight(1f).fillMaxWidth().padding(horizontal = sidePadding, vertical = 7.dp),
+                Modifier.fillMaxWidth().padding(horizontal = sidePadding, vertical = 7.dp),
                 verticalArrangement = Arrangement.spacedBy(gap),
             ) {
                 Row(
