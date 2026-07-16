@@ -77,12 +77,15 @@ fun RideScreen(
     var offsetY by rememberSaveable { mutableStateOf(0f) }
     var scale by rememberSaveable { mutableStateOf(1f) }
 
-    val isPortrait = LocalConfiguration.current.orientation == Configuration.ORIENTATION_PORTRAIT
+    val configuration = LocalConfiguration.current
+    val isPortrait = configuration.orientation == Configuration.ORIENTATION_PORTRAIT
+    // 小屏/分屏时优先保证仪表盘与所有控制功能完整可见。
+    val compactPortrait = configuration.screenHeightDp < 760
 
     if (isPortrait) {
         // ===== 竖屏：上地图 + 下停靠仪表盘 =====
         Column(modifier.fillMaxSize().background(Color.Black)) {
-            Box(Modifier.weight(0.54f).fillMaxWidth()) {
+            Box(Modifier.weight(if (compactPortrait) 0.42f else 0.48f).fillMaxWidth()) {
                 NavigationMapView(
                     modifier = Modifier.fillMaxSize(),
                     routePoints = liveRoute,
@@ -130,7 +133,7 @@ fun RideScreen(
                 }
             }
             PortraitDashboard(
-                modifier = Modifier.weight(0.46f),
+                modifier = Modifier.weight(if (compactPortrait) 0.58f else 0.52f),
                 state = state,
                 locked = locked,
                 highContrast = highContrast,
@@ -332,7 +335,7 @@ fun RideScreen(
     }
 }
 
-/** 竖屏停靠式仪表盘:大速度环 + 关键指标卡片 + 控制按钮。高度由父级 weight 约束,内容可滚动兜底,永不挤占地图。 */
+/** 竖屏自适应仪表盘：按可用高度压缩字号、间距与地图比例；控制区永远独立于数据区。 */
 @Composable
 private fun PortraitDashboard(
     state: RideState,
@@ -345,123 +348,99 @@ private fun PortraitDashboard(
     modifier: Modifier = Modifier,
 ) {
     val cadenceMode = state.sensorMode == SensorMode.CADENCE
+    val compact = LocalConfiguration.current.screenHeightDp < 760
+    val ringSize = if (compact) 92 else 108
+    val cardHeight = if (compact) 48.dp else 54.dp
+    val buttonHeight = if (compact) 48.dp else 52.dp
+    val sidePadding = if (compact) 12.dp else 16.dp
+    val gap = if (compact) 7.dp else 10.dp
+
     Surface(
         color = if (highContrast) Color(0xFF020A12) else Color(0xFF0A1622),
         contentColor = Color.White,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
         modifier = modifier.fillMaxWidth(),
     ) {
         Column(Modifier.fillMaxSize()) {
-            // 顶部拖柄
             Box(
-                Modifier
-                    .align(Alignment.CenterHorizontally)
-                    .padding(top = 10.dp)
-                    .width(44.dp)
-                    .height(5.dp)
+                Modifier.align(Alignment.CenterHorizontally).padding(top = 7.dp)
+                    .width(38.dp).height(4.dp)
                     .background(Color(0x33FFFFFF), RoundedCornerShape(3.dp)),
             )
-            // 可滚动统计区：占据除按钮外的剩余高度，内容超出时可滚动，绝不挤占底部按钮。
+            // 这里不再使用会把内容滚到按钮下方的滚动容器；所有核心数据在一屏内自适应缩放。
             Column(
-                Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 18.dp)
-                    .padding(top = 12.dp, bottom = 6.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
+                Modifier.weight(1f).fillMaxWidth().padding(horizontal = sidePadding, vertical = 7.dp),
+                verticalArrangement = Arrangement.spacedBy(gap),
             ) {
-                // Hero: 速度环 + 状态 + 时长/里程
                 Row(
                     Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(18.dp),
+                    horizontalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 14.dp),
                 ) {
                     SpeedRing(
                         value = if (cadenceMode) state.cadenceRpm else state.speedKmh,
                         unit = if (cadenceMode) "rpm" else "km/h",
                         maxValue = if (cadenceMode) 120.0 else 60.0,
-                        diameterDp = 120,
+                        diameterDp = ringSize,
                     )
-                    Column(
-                        Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(if (compact) 4.dp else 7.dp)) {
                         StatusPill(text = speedSourceLabel(state, cadenceMode), paused = state.isPaused)
-                        HeroStat(icon = "⏱", label = "骑行时长", value = state.durationText, accent = BrandCyan)
-                        HeroStat(icon = "🏁", label = "骑行路程", value = "%.2f km".format(state.distanceKm), accent = BrandGreen)
+                        CompactHeroStat("⏱", "骑行时长", state.durationText, BrandCyan, compact)
+                        CompactHeroStat("🏁", "骑行路程", "%.2f km".format(state.distanceKm), BrandGreen, compact)
                     }
                 }
-                // 指标卡片 2×2
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    StatChip(Modifier.weight(1f), "均速", "%.1f".format(state.avgSpeedKmh), "km/h", BrandCyan, highContrast)
-                    StatChip(
-                        Modifier.weight(1f),
-                        if (cadenceMode) "平均踏频" else "踏频",
-                        if (cadenceMode) "${state.avgCadenceRpm.roundToInt()}" else "0",
-                        "rpm",
-                        BrandGreen,
-                        highContrast,
-                    )
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(gap)) {
+                    AdaptiveStatChip(Modifier.weight(1f), "均速", "%.1f".format(state.avgSpeedKmh), "km/h", BrandCyan, highContrast, cardHeight, compact)
+                    AdaptiveStatChip(Modifier.weight(1f), if (cadenceMode) "平均踏频" else "踏频", if (cadenceMode) "${state.avgCadenceRpm.roundToInt()}" else "0", "rpm", BrandGreen, highContrast, cardHeight, compact)
                 }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    StatChip(Modifier.weight(1f), "消耗热量", "%.0f".format(state.calories), "kcal", PauseOrange, highContrast)
-                    StatChip(Modifier.weight(1f), "累计爬升", "%.0f".format(state.elevationGainM), "m", SpeedText, highContrast)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(gap)) {
+                    AdaptiveStatChip(Modifier.weight(1f), "消耗热量", "%.0f".format(state.calories), "kcal", PauseOrange, highContrast, cardHeight, compact)
+                    AdaptiveStatChip(Modifier.weight(1f), "累计爬升", "%.0f".format(state.elevationGainM), "m", SpeedText, highContrast, cardHeight, compact)
                 }
             }
-            // 常驻控制按钮：固定在面板底部，navigationBarsPadding 避开系统手势条，始终可点。
+            // 固定操作栏在安全区内：不参与滚动、不被手势条或统计卡片覆盖。
             Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 18.dp)
-                    .padding(top = 6.dp)
-                    .navigationBarsPadding()
-                    .padding(bottom = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                Modifier.fillMaxWidth().padding(horizontal = sidePadding).padding(top = 4.dp)
+                    .navigationBarsPadding().padding(bottom = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Box(
-                    Modifier
-                        .height(54.dp)
-                        .background(if (locked) StopRed else Color(0x1A0FF2FE), RoundedCornerShape(16.dp))
-                        .border(1.dp, BrandCyan.copy(alpha = 0.45f), RoundedCornerShape(16.dp))
-                        .pointerInput(Unit) {
-                            detectTapGestures(
-                                onTap = { if (!locked) onLock() },
-                                onLongPress = { if (locked) onUnlock() },
-                            )
-                        }
-                        .padding(horizontal = 18.dp),
+                    Modifier.height(buttonHeight).background(if (locked) StopRed else Color(0x1A0FF2FE), RoundedCornerShape(14.dp))
+                        .border(1.dp, BrandCyan.copy(alpha = 0.45f), RoundedCornerShape(14.dp))
+                        .pointerInput(Unit) { detectTapGestures(onTap = { if (!locked) onLock() }, onLongPress = { if (locked) onUnlock() }) }
+                        .padding(horizontal = if (compact) 13.dp else 16.dp),
                     contentAlignment = Alignment.Center,
-                ) {
-                    Text(if (locked) "🔒" else "🔓", fontSize = 20.sp)
+                ) { Text(if (locked) "🔒" else "🔓", fontSize = if (compact) 17.sp else 19.sp) }
+                Surface(onClick = onTogglePause, shape = RoundedCornerShape(14.dp), color = if (state.isPaused) BrandCyan else PauseOrange, contentColor = Color(0xFF060913), modifier = Modifier.weight(1f).height(buttonHeight)) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(if (state.isPaused) "▶ 恢复" else "⏸ 暂停", fontSize = if (compact) 14.sp else 15.sp, fontWeight = FontWeight.Bold) }
                 }
-                Surface(
-                    onClick = onTogglePause,
-                    shape = RoundedCornerShape(16.dp),
-                    color = if (state.isPaused) BrandCyan else PauseOrange,
-                    contentColor = Color(0xFF060913),
-                    modifier = Modifier.weight(1f).height(54.dp),
-                ) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(
-                            if (state.isPaused) "▶ 恢复骑行" else "⏸ 暂停",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    }
+                Surface(onClick = onStopRequest, shape = RoundedCornerShape(14.dp), color = StopRed, contentColor = Color.White, modifier = Modifier.weight(1f).height(buttonHeight)) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("■ 结束", fontSize = if (compact) 14.sp else 15.sp, fontWeight = FontWeight.Bold) }
                 }
-                Surface(
-                    onClick = onStopRequest,
-                    shape = RoundedCornerShape(16.dp),
-                    color = StopRed,
-                    contentColor = Color.White,
-                    modifier = Modifier.weight(1f).height(54.dp),
-                ) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("■ 结束", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CompactHeroStat(icon: String, label: String, value: String, accent: Color, compact: Boolean) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+        Text(icon, fontSize = if (compact) 13.sp else 15.sp)
+        Text(value, fontSize = if (compact) 18.sp else 20.sp, fontWeight = FontWeight.ExtraBold, color = accent, maxLines = 1)
+        Text(label, fontSize = if (compact) 10.sp else 11.sp, color = DataLabel, maxLines = 1)
+    }
+}
+
+@Composable
+private fun AdaptiveStatChip(modifier: Modifier, label: String, value: String, unit: String, accent: Color, highContrast: Boolean, height: androidx.compose.ui.unit.Dp, compact: Boolean) {
+    Row(modifier.height(height).background(if (highContrast) Color(0x33FFFFFF) else Color(0x14FFFFFF), RoundedCornerShape(13.dp)).border(1.dp, GlassBorder, RoundedCornerShape(13.dp)), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.padding(start = if (compact) 7.dp else 9.dp).width(3.dp).height(if (compact) 25.dp else 29.dp).background(accent, RoundedCornerShape(2.dp)))
+        Column(Modifier.padding(horizontal = if (compact) 8.dp else 10.dp)) {
+            Text(label, fontSize = if (compact) 9.sp else 10.sp, color = DataLabel, maxLines = 1)
+            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(value, fontSize = if (compact) 16.sp else 18.sp, fontWeight = FontWeight.ExtraBold, color = SpeedText, maxLines = 1)
+                Text(unit, fontSize = if (compact) 9.sp else 10.sp, color = DataLabel, modifier = Modifier.padding(bottom = 2.dp), maxLines = 1)
             }
         }
     }

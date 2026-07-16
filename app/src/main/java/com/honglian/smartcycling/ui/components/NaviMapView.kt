@@ -1,6 +1,7 @@
 package com.honglian.smartcycling.ui.components
 
 import android.location.Location
+import android.media.AudioAttributes
 import android.speech.tts.TextToSpeech
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -62,9 +63,20 @@ fun NaviVoiceGuide(
                                 r == TextToSpeech.LANG_COUNTRY_VAR_AVAILABLE
                         }
                         if (ok == null) engine?.setLanguage(Locale.getDefault())
-                        engine?.setSpeechRate(1.0f)
+                        // 明确走“导航语音”音频通道，避免被普通媒体音量/静音策略错误路由。
+                        engine?.setAudioAttributes(
+                            AudioAttributes.Builder()
+                                .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
+                                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                                .build(),
+                        )
+                        engine?.setSpeechRate(0.95f)
                     }
+                    // 初始化成功后先播一段短提示，验证引擎与音频通道；主循环随后播报完整路线信息。
                     ttsReady.value = true
+                    runCatching {
+                        engine?.speak("骑行导航语音已开启", TextToSpeech.QUEUE_FLUSH, null, "nav_ready")
+                    }
                 }
             }
         }.getOrNull()
