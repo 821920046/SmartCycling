@@ -39,7 +39,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
@@ -64,6 +63,7 @@ import com.honglian.smartcycling.offline.MapCrs
 import com.honglian.smartcycling.offline.OfflineMapFormat
 import com.honglian.smartcycling.offline.OfflineMapsViewModel
 import com.honglian.smartcycling.ui.theme.AppTheme
+import com.honglian.smartcycling.ui.theme.AppType
 import com.honglian.smartcycling.ui.theme.Radius
 import com.honglian.smartcycling.ui.theme.Space
 
@@ -116,7 +116,7 @@ fun OfflineMapsScreen(
                 }
                 Text(
                     stringResource(R.string.map_nav_offline_maps),
-                    style = MaterialTheme.typography.title,
+                    style = AppType.title,
                     color = palette.textPrimary,
                     modifier = Modifier.weight(1f),
                 )
@@ -139,7 +139,7 @@ fun OfflineMapsScreen(
                     ) {
                         Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(Space.sm))
-                        Text(stringResource(R.string.offline_import_file), style = MaterialTheme.typography.subtitle)
+                        Text(stringResource(R.string.offline_import_file), style = AppType.subtitle)
                     }
                     OutlinedButton(
                         onClick = { folderPicker.launch(null) },
@@ -149,7 +149,7 @@ fun OfflineMapsScreen(
                     ) {
                         Icon(Icons.Outlined.CreateNewFolder, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(Space.sm))
-                        Text(stringResource(R.string.offline_import_folder), style = MaterialTheme.typography.subtitle)
+                        Text(stringResource(R.string.offline_import_folder), style = AppType.subtitle)
                     }
                 }
 
@@ -164,7 +164,7 @@ fun OfflineMapsScreen(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
                                     importState.label,
-                                    style = MaterialTheme.typography.body,
+                                    style = AppType.body,
                                     color = palette.textPrimary,
                                     modifier = Modifier.weight(1f),
                                 )
@@ -187,7 +187,7 @@ fun OfflineMapsScreen(
                                 } else {
                                     stringResource(R.string.offline_copying)
                                 },
-                                style = MaterialTheme.typography.caption,
+                                style = AppType.caption,
                                 color = palette.textTertiary,
                             )
                         }
@@ -226,7 +226,7 @@ fun OfflineMapsScreen(
                             Spacer(Modifier.width(Space.sm))
                             Text(
                                 msg,
-                                style = MaterialTheme.typography.body,
+                                style = AppType.body,
                                 color = palette.textPrimary,
                                 modifier = Modifier.weight(1f),
                             )
@@ -248,7 +248,7 @@ fun OfflineMapsScreen(
                     ) {
                         Text(
                             stringResource(R.string.offline_empty),
-                            style = MaterialTheme.typography.body,
+                            style = AppType.body,
                             color = palette.textTertiary,
                         )
                     }
@@ -278,11 +278,11 @@ fun OfflineMapsScreen(
             containerColor = palette.surface,
             titleContentColor = palette.textPrimary,
             textContentColor = palette.textSecondary,
-            title = { Text(stringResource(R.string.offline_delete_title), style = MaterialTheme.typography.title) },
+            title = { Text(stringResource(R.string.offline_delete_title), style = AppType.title) },
             text = {
                 Text(
                     stringResource(R.string.offline_delete_text, entity.name, viewModel.formatSize(entity.sizeBytes)),
-                    style = MaterialTheme.typography.body,
+                    style = AppType.body,
                 )
             },
             confirmButton = {
@@ -327,13 +327,13 @@ private fun GuideCard() {
                 Spacer(Modifier.width(Space.sm))
                 Text(
                     stringResource(R.string.offline_guide_title),
-                    style = MaterialTheme.typography.subtitle,
+                    style = AppType.subtitle,
                     color = palette.textPrimary,
                     modifier = Modifier.weight(1f),
                 )
                 Text(
                     stringResource(if (expanded) R.string.offline_collapse else R.string.offline_expand),
-                    style = MaterialTheme.typography.caption,
+                    style = AppType.caption,
                     color = palette.primary,
                 )
             }
@@ -349,7 +349,7 @@ private fun GuideCard() {
                 lines.forEach {
                     Text(
                         "· $it",
-                        style = MaterialTheme.typography.caption,
+                        style = AppType.caption,
                         color = palette.textSecondary,
                         modifier = Modifier.padding(bottom = Space.xs),
                     )
@@ -386,13 +386,13 @@ private fun MapCard(
                 Column(Modifier.weight(1f)) {
                     Text(
                         entity.name,
-                        style = MaterialTheme.typography.subtitle,
+                        style = AppType.subtitle,
                         color = palette.textPrimary,
                     )
                     Spacer(Modifier.height(2.dp))
                     Text(
                         stringResource(R.string.offline_card_meta, format.label, entity.minZoom, entity.maxZoom, entity.tileCount, sizeText),
-                        style = MaterialTheme.typography.caption,
+                        style = AppType.caption,
                         color = palette.textTertiary,
                     )
                 }
@@ -410,7 +410,7 @@ private fun MapCard(
                 Spacer(Modifier.height(Space.xs))
                 Text(
                     stringResource(R.string.offline_missing),
-                    style = MaterialTheme.typography.caption,
+                    style = AppType.caption,
                     color = palette.danger,
                 )
             }
@@ -425,14 +425,14 @@ private fun MapCard(
                 Icon(Icons.Outlined.Map, contentDescription = null, tint = palette.primary, modifier = Modifier.size(15.dp))
                 Spacer(Modifier.width(Space.sm))
                 Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.offline_crs), style = MaterialTheme.typography.caption, color = palette.textTertiary)
+                    Text(stringResource(R.string.offline_crs), style = AppType.caption, color = palette.textTertiary)
                     Text(
                         crs.label,
-                        style = MaterialTheme.typography.label,
+                        style = AppType.label,
                         color = palette.textPrimary,
                     )
                 }
-                Text(stringResource(R.string.offline_edit), style = MaterialTheme.typography.caption, color = palette.primary)
+                Text(stringResource(R.string.offline_edit), style = AppType.caption, color = palette.primary)
             }
         }
     }
@@ -453,12 +453,12 @@ private fun CrsDialog(
         titleContentColor = palette.textPrimary,
         textContentColor = palette.textSecondary,
         confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_done), color = palette.primary) } },
-        title = { Text(stringResource(R.string.offline_crs_title), style = MaterialTheme.typography.title) },
+        title = { Text(stringResource(R.string.offline_crs_title), style = AppType.title) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 Text(
                     stringResource(R.string.offline_crs_desc),
-                    style = MaterialTheme.typography.caption,
+                    style = AppType.caption,
                     color = palette.textTertiary,
                     modifier = Modifier.padding(bottom = Space.sm),
                 )
@@ -475,13 +475,13 @@ private fun CrsDialog(
                         Column {
                             Text(
                                 crs.label,
-                                style = MaterialTheme.typography.body,
+                                style = AppType.body,
                                 color = palette.textPrimary,
                                 fontWeight = FontWeight.Medium,
                             )
                             Text(
                                 crs.hint,
-                                style = MaterialTheme.typography.caption,
+                                style = AppType.caption,
                                 color = palette.textTertiary,
                             )
                         }

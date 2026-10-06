@@ -11,6 +11,7 @@ import com.honglian.smartcycling.offline.GeoTransform
 import com.honglian.smartcycling.offline.MapCrs
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -35,6 +36,24 @@ class MapViewModel(app: Application) : AndroidViewModel(app) {
     private val container = (app as SmartCyclingApp).container
 
     /**
+     * 纠偏后的位置流,**显式标注为可空**。
+     *
+     * 必须写成 `Flow<LatLng?>` 而不是让编译器从 `map { LatLng(...) }` 推成 `Flow<LatLng>`:
+     * `stateIn` 是 `Flow<T>` 的扩展,T 由**接收者**固定,函数返回类型 `StateFlow<LatLng?>` 不会
+     * 反向约束到接收者。若 T 被推成非空 `LatLng`,后面的 `catch { emit(null) }` 与
+     * `stateIn(..., null)` 都会报 "Null can not be a value of a non-null type LatLng"。
+     *
+     * 注意:必须声明在 [currentLatLng] **之前**——Kotlin 类属性按声明顺序初始化,
+     * 前置引用会读到未初始化的 null。
+     */
+    private val correctedLocation: Flow<LatLng?> = container.locationTracker.track()
+        .filter { it.isReliable }
+        .map {
+            val w = GeoTransform.convert(it.latitude, it.longitude, MapCrs.GCJ02, MapCrs.WGS84)
+            LatLng(w[0], w[1])
+        }
+
+    /**
      * 当前位置(**WGS-84**),用于在**离线底图**上绘制"我的位置"。
      *
      * 关键:定位源([com.honglian.smartcycling.location.LocationTracker])统一走高德定位,
@@ -44,12 +63,7 @@ class MapViewModel(app: Application) : AndroidViewModel(app) {
      * 采用 `WhileSubscribed`:只有地图页真正在观察时才启动定位,离开 5s 后自动停止,不长期耗电。
      * 无定位权限等异常静默降级为"不显示蓝点",不影响其余功能。
      */
-    val currentLatLng: StateFlow<LatLng?> = container.locationTracker.track()
-        .filter { it.isReliable }
-        .map {
-            val w = GeoTransform.convert(it.latitude, it.longitude, MapCrs.GCJ02, MapCrs.WGS84)
-            LatLng(w[0], w[1])
-        }
+    val currentLatLng: StateFlow<LatLng?> = correctedLocation
         .catch { emit(null) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 

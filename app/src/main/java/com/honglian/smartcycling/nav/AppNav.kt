@@ -154,7 +154,9 @@ fun AppNav(
             } else {
                 idleLocation
             }
-            val currentLocation by locationFlow.collectAsState()
+            // 普通 Flow 的 collectAsState 必须显式给出初始值(没有无参重载);
+            // 首帧尚无定位结果,故初始为 null("暂时不显示蓝点")。
+            val currentLocation by locationFlow.collectAsState(initial = null)
             MapScreen(
                 routePoints = routePoints,
                 destination = destination,

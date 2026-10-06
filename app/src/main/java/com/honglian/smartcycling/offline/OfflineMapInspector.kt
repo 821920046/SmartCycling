@@ -49,6 +49,11 @@ object OfflineMapInspector {
             OfflineMapFormat.SQLITE -> inspectSqlite(file, mbtiles = false)
             OfflineMapFormat.GEOPACKAGE -> inspectGeoPackage(file)
             OfflineMapFormat.ZIP -> inspectZip(file)
+            // [detectFormat] 只对"文件"做判定,永不返回 FOLDER(该值专用于目录导入路径,
+            // 已在函数开头的 isDirectory 分支处理)。此分支只为满足 when 的穷尽性;
+            // 万一调用方语义变化导致真被命中,按目录探测仍是最合理的降级
+            // (inspectFolder 全程 runCatching 包裹,传文件也不会抛异常)。
+            OfflineMapFormat.FOLDER -> inspectFolder(file)
             OfflineMapFormat.PMTILES -> OfflineMapProbe(
                 format = format, minZoom = 0, maxZoom = 0, tileSize = 256, tileCount = 0, bounds = null,
                 declaredName = null,

@@ -41,7 +41,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.RadioButton
@@ -77,6 +76,7 @@ import com.honglian.smartcycling.offline.OfflineMapView
 import com.honglian.smartcycling.offline.toWgs84
 import com.honglian.smartcycling.ui.components.NavigationMapView
 import com.honglian.smartcycling.ui.theme.AppTheme
+import com.honglian.smartcycling.ui.theme.AppType
 import com.honglian.smartcycling.ui.theme.Radius
 import com.honglian.smartcycling.ui.theme.Space
 
@@ -172,7 +172,7 @@ fun MapScreen(
                             query = it
                             onKeywordChanged(it)
                         },
-                        placeholder = { Text(stringResource(R.string.map_search_hint), style = MaterialTheme.typography.body) },
+                        placeholder = { Text(stringResource(R.string.map_search_hint), style = AppType.body) },
                         singleLine = true,
                         shape = RoundedCornerShape(Radius.md),
                         leadingIcon = {
@@ -200,7 +200,7 @@ fun MapScreen(
                                 modifier = Modifier.size(18.dp),
                             )
                         } else {
-                            Text(stringResource(R.string.map_plan), style = MaterialTheme.typography.subtitle)
+                            Text(stringResource(R.string.map_plan), style = AppType.subtitle)
                         }
                     }
                 }
@@ -270,7 +270,7 @@ fun MapScreen(
                     Spacer(Modifier.height(Space.xs))
                     Text(
                         text = status,
-                        style = MaterialTheme.typography.caption,
+                        style = AppType.caption,
                         color = palette.textSecondary,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
@@ -309,7 +309,7 @@ fun MapScreen(
                 ) {
                     Text(
                         stringResource(R.string.map_estimated_distance, Units.distanceText(distanceKm, AppTheme.units, decimals = 1)),
-                        style = MaterialTheme.typography.label,
+                        style = AppType.label,
                         color = palette.textPrimary,
                         modifier = Modifier.padding(horizontal = Space.lg, vertical = Space.sm),
                     )
@@ -365,7 +365,7 @@ private fun SuggestionRow(poi: PoiItem, onClick: () -> Unit) {
         Column(Modifier.weight(1f)) {
             Text(
                 text = poi.title?.takeIf { it.isNotBlank() } ?: stringResource(R.string.map_unknown_place),
-                style = MaterialTheme.typography.body,
+                style = AppType.body,
                 color = palette.textPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -374,7 +374,7 @@ private fun SuggestionRow(poi: PoiItem, onClick: () -> Unit) {
             if (address.isNotBlank()) {
                 Text(
                     text = address,
-                    style = MaterialTheme.typography.caption,
+                    style = AppType.caption,
                     color = palette.textTertiary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -412,7 +412,7 @@ private fun EngineChip(
             Spacer(Modifier.width(6.dp))
             Text(
                 text = label,
-                style = MaterialTheme.typography.label,
+                style = AppType.label,
                 color = when {
                     selected -> palette.onPrimaryContainer
                     enabled -> palette.textSecondary
@@ -474,12 +474,12 @@ private fun WheelDialog(
         titleContentColor = palette.textPrimary,
         textContentColor = palette.textSecondary,
         confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_done), color = palette.primary) } },
-        title = { Text(stringResource(R.string.settings_wheel_dialog_title), style = MaterialTheme.typography.title) },
+        title = { Text(stringResource(R.string.settings_wheel_dialog_title), style = AppType.title) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 Text(
                     stringResource(R.string.map_wheel_dialog_desc),
-                    style = MaterialTheme.typography.caption,
+                    style = AppType.caption,
                     modifier = Modifier.padding(bottom = Space.sm),
                 )
                 WheelPreset.entries.forEach { p ->
@@ -493,10 +493,10 @@ private fun WheelDialog(
                         RadioButton(selected = p == current, onClick = { onSelect(p) })
                         Spacer(Modifier.width(Space.sm))
                         Column {
-                            Text(p.label, style = MaterialTheme.typography.body, color = palette.textPrimary)
+                            Text(p.label, style = AppType.body, color = palette.textPrimary)
                             Text(
                                 stringResource(R.string.map_wheel_circumference, p.circumferenceMm),
-                                style = MaterialTheme.typography.caption,
+                                style = AppType.caption,
                                 color = palette.textTertiary,
                             )
                         }
@@ -523,7 +523,7 @@ private fun LayerDialog(current: Int, onSelect: (Int) -> Unit, onDismiss: () -> 
         titleContentColor = palette.textPrimary,
         textContentColor = palette.textSecondary,
         confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close), color = palette.primary) } },
-        title = { Text(stringResource(R.string.map_layer_dialog_title), style = MaterialTheme.typography.title) },
+        title = { Text(stringResource(R.string.map_layer_dialog_title), style = AppType.title) },
         text = {
             Column {
                 options.forEach { (type, label) ->
@@ -536,12 +536,12 @@ private fun LayerDialog(current: Int, onSelect: (Int) -> Unit, onDismiss: () -> 
                     ) {
                         RadioButton(selected = type == current, onClick = { onSelect(type) })
                         Spacer(Modifier.width(Space.sm))
-                        Text(label, style = MaterialTheme.typography.body, color = palette.textPrimary)
+                        Text(label, style = AppType.body, color = palette.textPrimary)
                     }
                 }
                 Text(
                     stringResource(R.string.map_layer_dialog_desc),
-                    style = MaterialTheme.typography.caption,
+                    style = AppType.caption,
                     color = palette.textTertiary,
                 )
             }

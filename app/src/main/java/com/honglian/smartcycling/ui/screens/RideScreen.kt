@@ -268,6 +268,9 @@ fun RideScreen(
                     // 满量程也要跟着换算,否则切到英制后指针永远打不满(60 km/h = 37 mph)。
                     maxValue = if (cadenceMode) 120.0 else Units.speedValue(60.0, units),
                     diameterDp = 150,
+                    // 双主题重构后 SpeedRing 的强调色改为由调用方传入(原来是写死的青→绿渐变),
+                    // 这里用 HUD 主强调色。
+                    accent = BrandCyan,
                 )
                 Text(
                     speedSourceLabel(state, cadenceMode),
@@ -449,6 +452,7 @@ private fun PortraitDashboard(
                         unit = if (cadenceMode) "rpm" else Units.speedUnit(units),
                         maxValue = if (cadenceMode) 120.0 else Units.speedValue(60.0, units),
                         diameterDp = ringSize,
+                        accent = BrandCyan,
                     )
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(if (compact) 4.dp else 7.dp)) {
                         StatusPill(text = speedSourceLabel(state, cadenceMode), paused = state.isPaused)

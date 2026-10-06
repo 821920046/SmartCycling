@@ -44,7 +44,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -78,6 +77,7 @@ import com.honglian.smartcycling.R
 import com.honglian.smartcycling.ble.ConnectionState
 import com.honglian.smartcycling.pairing.DiscoveredDevice
 import com.honglian.smartcycling.ui.theme.AppTheme
+import com.honglian.smartcycling.ui.theme.AppType
 import com.honglian.smartcycling.ui.theme.Radius
 import com.honglian.smartcycling.ui.theme.Space
 
@@ -150,13 +150,13 @@ fun PairingScreen(
             Spacer(Modifier.height(Space.xxl))
             Text(
                 text = stringResource(R.string.pairing_title),
-                style = MaterialTheme.typography.headlineMedium,
+                style = AppType.title,
                 color = palette.textPrimary,
             )
             Spacer(Modifier.height(Space.xs))
             Text(
                 text = stringResource(R.string.pairing_subtitle),
-                style = MaterialTheme.typography.label,
+                style = AppType.label,
                 color = palette.textSecondary,
             )
             Spacer(Modifier.height(Space.xl))
@@ -182,7 +182,7 @@ fun PairingScreen(
                 if (connection == ConnectionState.DISCONNECTED) {
                     Text(
                         text = stringResource(R.string.pairing_wake_hint),
-                        style = MaterialTheme.typography.caption,
+                        style = AppType.caption,
                         color = palette.textTertiary,
                     )
                     Spacer(Modifier.height(Space.md))
@@ -197,14 +197,14 @@ fun PairingScreen(
                     ) {
                         Icon(Icons.Outlined.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(Space.sm))
-                        Text(stringResource(R.string.pairing_rescan), style = MaterialTheme.typography.subtitle)
+                        Text(stringResource(R.string.pairing_rescan), style = AppType.subtitle)
                     }
                     Spacer(Modifier.height(Space.sm))
                     // 传感器没电/不在身边时不应把用户卡死在配对页:GPS 本身即可完成基础骑行记录。
                     TextButton(onClick = onSkip) {
                         Text(
                             stringResource(R.string.pairing_skip),
-                            style = MaterialTheme.typography.label,
+                            style = AppType.label,
                             color = palette.textTertiary,
                         )
                     }
@@ -222,15 +222,15 @@ fun PairingScreen(
             containerColor = palette.surface,
             titleContentColor = palette.textPrimary,
             textContentColor = palette.textSecondary,
-            title = { Text(stringResource(R.string.pairing_need_hw_title), style = MaterialTheme.typography.title) },
+            title = { Text(stringResource(R.string.pairing_need_hw_title), style = AppType.title) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(Space.xs)) {
-                    if (!bluetoothOn) Text(stringResource(R.string.pairing_bt_off), color = palette.danger, style = MaterialTheme.typography.label)
-                    if (!locationOn) Text(stringResource(R.string.pairing_loc_off), color = palette.danger, style = MaterialTheme.typography.label)
+                    if (!bluetoothOn) Text(stringResource(R.string.pairing_bt_off), color = palette.danger, style = AppType.label)
+                    if (!locationOn) Text(stringResource(R.string.pairing_loc_off), color = palette.danger, style = AppType.label)
                     Spacer(Modifier.height(Space.xs))
                     Text(
                         stringResource(R.string.pairing_hw_rationale),
-                        style = MaterialTheme.typography.body,
+                        style = AppType.body,
                     )
                 }
             },
@@ -303,7 +303,7 @@ private fun HardwareBlocked(
             Spacer(Modifier.height(Space.md))
             Text(
                 text = stringResource(if (!bluetoothOn) R.string.pairing_need_bt else R.string.pairing_need_loc),
-                style = MaterialTheme.typography.subtitle,
+                style = AppType.subtitle,
                 color = palette.textSecondary,
             )
         }
@@ -317,21 +317,21 @@ private fun ConnectionStatus(connection: ConnectionState) {
         ConnectionState.CONNECTING -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
             CircularProgressIndicator(color = palette.primary, strokeWidth = 3.dp)
             Spacer(Modifier.height(Space.md))
-            Text(stringResource(R.string.pairing_connecting), style = MaterialTheme.typography.subtitle, color = palette.primary)
+            Text(stringResource(R.string.pairing_connecting), style = AppType.subtitle, color = palette.primary)
         }
         ConnectionState.READY -> Text(
             stringResource(R.string.pairing_connected),
-            style = MaterialTheme.typography.subtitle,
+            style = AppType.subtitle,
             color = palette.success,
         )
         ConnectionState.DISCONNECTING -> Text(
             stringResource(R.string.pairing_disconnecting),
-            style = MaterialTheme.typography.body,
+            style = AppType.body,
             color = palette.textSecondary,
         )
         ConnectionState.DISCONNECTED -> Text(
             stringResource(R.string.pairing_searching),
-            style = MaterialTheme.typography.subtitle,
+            style = AppType.subtitle,
             color = palette.textSecondary,
         )
     }
@@ -347,17 +347,17 @@ private fun HrStatus(hrConnection: ConnectionState) {
     when (hrConnection) {
         ConnectionState.READY -> Text(
             stringResource(R.string.pairing_hr_connected),
-            style = MaterialTheme.typography.caption,
+            style = AppType.caption,
             color = palette.success,
         )
         ConnectionState.CONNECTING, ConnectionState.DISCONNECTING -> Text(
             stringResource(R.string.pairing_hr_connecting),
-            style = MaterialTheme.typography.caption,
+            style = AppType.caption,
             color = palette.textSecondary,
         )
         ConnectionState.DISCONNECTED -> Text(
             stringResource(R.string.pairing_hr_hint),
-            style = MaterialTheme.typography.caption,
+            style = AppType.caption,
             color = palette.textTertiary,
         )
     }
@@ -381,7 +381,7 @@ private fun DeviceList(
                 ) {
                     Text(
                         stringResource(R.string.pairing_no_device),
-                        style = MaterialTheme.typography.body,
+                        style = AppType.body,
                         color = palette.textTertiary,
                     )
                 }
@@ -451,19 +451,19 @@ private fun DeviceRow(device: DiscoveredDevice, onClick: () -> Unit) {
                 Column {
                     Text(
                         text = device.name.ifBlank { unknownDevice } + tag,
-                        style = MaterialTheme.typography.subtitle,
+                        style = AppType.subtitle,
                         color = palette.textPrimary,
                     )
                     Text(
                         text = device.device.address,
-                        style = MaterialTheme.typography.caption,
+                        style = AppType.caption,
                         color = palette.textTertiary,
                     )
                 }
             }
             Text(
                 text = "${device.rssi} dBm",
-                style = MaterialTheme.typography.label,
+                style = AppType.label,
                 color = if (device.rssi >= -70) palette.success else palette.textTertiary,
             )
         }

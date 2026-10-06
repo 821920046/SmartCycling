@@ -34,7 +34,6 @@ import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -67,6 +66,7 @@ import com.honglian.smartcycling.core.UnitSystem
 import com.honglian.smartcycling.core.Units
 import com.honglian.smartcycling.core.WheelPreset
 import com.honglian.smartcycling.ui.theme.AppTheme
+import com.honglian.smartcycling.ui.theme.AppType
 import com.honglian.smartcycling.ui.theme.Radius
 import com.honglian.smartcycling.ui.theme.Space
 
@@ -139,7 +139,7 @@ fun SettingsScreen(
                 }
                 Text(
                     stringResource(R.string.settings_title),
-                    style = MaterialTheme.typography.title,
+                    style = AppType.title,
                     color = palette.textPrimary,
                     modifier = Modifier.weight(1f),
                 )
@@ -266,7 +266,7 @@ fun SettingsScreen(
                             R.string.settings_auto_lap_distance,
                             Units.distanceText(autoLapDistanceKm.toDouble(), unitSystem, decimals = 1),
                         ),
-                        style = MaterialTheme.typography.caption,
+                        style = AppType.caption,
                         color = palette.textTertiary,
                     )
                     Slider(
@@ -289,7 +289,7 @@ fun SettingsScreen(
                     Spacer(Modifier.height(Space.sm))
                     Text(
                         stringResource(R.string.settings_auto_pause_threshold, autoPauseThreshold),
-                        style = MaterialTheme.typography.caption,
+                        style = AppType.caption,
                         color = palette.textTertiary,
                     )
                     Slider(
@@ -339,7 +339,7 @@ fun SettingsScreen(
                     Spacer(Modifier.height(Space.xs))
                     Text(
                         stringResource(R.string.settings_cloud_token_desc),
-                        style = MaterialTheme.typography.caption,
+                        style = AppType.caption,
                         color = palette.textTertiary,
                     )
                     Spacer(Modifier.height(Space.sm))
@@ -352,7 +352,7 @@ fun SettingsScreen(
                     Spacer(Modifier.height(Space.xs))
                     Text(
                         stringResource(R.string.settings_privacy_note),
-                        style = MaterialTheme.typography.caption,
+                        style = AppType.caption,
                         color = palette.textTertiary,
                     )
                     Spacer(Modifier.height(Space.sm))
@@ -376,12 +376,12 @@ fun SettingsScreen(
                 Section(icon = Icons.Outlined.Info, title = stringResource(R.string.settings_section_about)) {
                     Text(
                         stringResource(R.string.settings_about_version, BuildConfig.VERSION_NAME),
-                        style = MaterialTheme.typography.body,
+                        style = AppType.body,
                         color = palette.textPrimary,
                     )
                     Text(
                         stringResource(R.string.settings_about_credits),
-                        style = MaterialTheme.typography.caption,
+                        style = AppType.caption,
                         color = palette.textTertiary,
                     )
                 }
@@ -396,8 +396,8 @@ fun SettingsScreen(
             containerColor = palette.surface,
             titleContentColor = palette.textPrimary,
             textContentColor = palette.textSecondary,
-            title = { Text(stringResource(R.string.settings_clear_confirm_title), style = MaterialTheme.typography.title) },
-            text = { Text(stringResource(R.string.settings_clear_confirm_text), style = MaterialTheme.typography.body) },
+            title = { Text(stringResource(R.string.settings_clear_confirm_title), style = AppType.title) },
+            text = { Text(stringResource(R.string.settings_clear_confirm_text), style = AppType.body) },
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.clearAllRides()
@@ -445,7 +445,7 @@ private fun Section(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(icon, contentDescription = null, tint = palette.primary, modifier = Modifier.size(17.dp))
             Spacer(Modifier.width(Space.sm))
-            Text(title, style = MaterialTheme.typography.subtitle, color = palette.textPrimary)
+            Text(title, style = AppType.subtitle, color = palette.textPrimary)
         }
         Spacer(Modifier.height(Space.sm))
         Surface(
@@ -477,8 +477,8 @@ private fun RowItem(
         Icon(icon, contentDescription = null, tint = palette.textSecondary, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(Space.md))
         Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.body, color = palette.textPrimary)
-            Text(subtitle, style = MaterialTheme.typography.caption, color = palette.textTertiary)
+            Text(title, style = AppType.body, color = palette.textPrimary)
+            Text(subtitle, style = AppType.caption, color = palette.textTertiary)
         }
         Icon(Icons.Outlined.ChevronRight, contentDescription = null, tint = palette.textTertiary)
     }
@@ -499,8 +499,8 @@ private fun SwitchRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.body, color = palette.textPrimary)
-            Text(subtitle, style = MaterialTheme.typography.caption, color = palette.textTertiary)
+            Text(title, style = AppType.body, color = palette.textPrimary)
+            Text(subtitle, style = AppType.caption, color = palette.textTertiary)
         }
         Spacer(Modifier.width(Space.sm))
         Switch(checked = checked, onCheckedChange = onCheckedChange)
@@ -516,7 +516,7 @@ private fun SegmentedRow(
 ) {
     val palette = AppTheme.palette
     Column {
-        Text(label, style = MaterialTheme.typography.caption, color = palette.textTertiary)
+        Text(label, style = AppType.caption, color = palette.textTertiary)
         Spacer(Modifier.height(Space.sm))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
             options.forEach { (value, text) ->
@@ -531,7 +531,7 @@ private fun SegmentedRow(
                     Box(Modifier.padding(vertical = Space.sm), contentAlignment = Alignment.Center) {
                         Text(
                             text,
-                            style = MaterialTheme.typography.label,
+                            style = AppType.label,
                             color = if (isSelected) palette.onPrimaryContainer else palette.textSecondary,
                             fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
                         )
@@ -564,7 +564,7 @@ private fun WheelPickDialog(
         titleContentColor = palette.textPrimary,
         textContentColor = palette.textSecondary,
         confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_done), color = palette.primary) } },
-        title = { Text(stringResource(R.string.settings_wheel_dialog_title), style = MaterialTheme.typography.title) },
+        title = { Text(stringResource(R.string.settings_wheel_dialog_title), style = AppType.title) },
         text = {
             Column(Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState())) {
                 WheelPreset.entries.forEach { p ->
@@ -578,10 +578,10 @@ private fun WheelPickDialog(
                         RadioButton(selected = p == current, onClick = { onSelect(p) })
                         Spacer(Modifier.width(Space.sm))
                         Column {
-                            Text(p.label, style = MaterialTheme.typography.body, color = palette.textPrimary)
+                            Text(p.label, style = AppType.body, color = palette.textPrimary)
                             Text(
                                 stringResource(R.string.settings_wheel_mm, p.circumferenceMm),
-                                style = MaterialTheme.typography.caption,
+                                style = AppType.caption,
                                 color = palette.textTertiary,
                             )
                         }
@@ -608,7 +608,7 @@ private fun <T> PickerDialog(
         titleContentColor = palette.textPrimary,
         textContentColor = palette.textSecondary,
         confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel), color = palette.primary) } },
-        title = { Text(title, style = MaterialTheme.typography.title) },
+        title = { Text(title, style = AppType.title) },
         text = {
             Column {
                 options.forEach { (value, label) ->
@@ -621,7 +621,7 @@ private fun <T> PickerDialog(
                     ) {
                         RadioButton(selected = value == current, onClick = { onSelect(value) })
                         Spacer(Modifier.width(Space.sm))
-                        Text(label, style = MaterialTheme.typography.body, color = palette.textPrimary)
+                        Text(label, style = AppType.body, color = palette.textPrimary)
                     }
                 }
             }

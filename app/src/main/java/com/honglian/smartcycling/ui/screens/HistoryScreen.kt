@@ -40,7 +40,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -76,6 +75,7 @@ import com.honglian.smartcycling.ride.LapSplit
 import com.honglian.smartcycling.ride.Laps
 import com.honglian.smartcycling.ui.components.NavigationMapView
 import com.honglian.smartcycling.ui.theme.AppTheme
+import com.honglian.smartcycling.ui.theme.AppType
 import com.honglian.smartcycling.ui.theme.Radius
 import com.honglian.smartcycling.ui.theme.Space
 import kotlinx.coroutines.launch
@@ -155,7 +155,7 @@ fun HistoryScreen(
                 }
                 Text(
                     stringResource(R.string.map_nav_history),
-                    style = MaterialTheme.typography.title,
+                    style = AppType.title,
                     color = palette.textPrimary,
                     modifier = Modifier.weight(1f),
                 )
@@ -211,7 +211,7 @@ fun HistoryScreen(
                                 Spacer(Modifier.width(Space.xs))
                                 Text(
                                     stringResource(R.string.history_personal_records),
-                                    style = MaterialTheme.typography.subtitle,
+                                    style = AppType.subtitle,
                                     color = palette.textPrimary,
                                 )
                             }
@@ -247,7 +247,7 @@ fun HistoryScreen(
                         ) {
                             Text(
                                 stringResource(R.string.history_empty),
-                                style = MaterialTheme.typography.body,
+                                style = AppType.body,
                                 color = palette.textTertiary,
                             )
                         }
@@ -290,7 +290,7 @@ fun HistoryScreen(
                     Column(Modifier.weight(1f)) {
                         Text(
                             fmt.format(Date(ride.startedAt)),
-                            style = MaterialTheme.typography.subtitle,
+                            style = AppType.subtitle,
                             color = palette.textPrimary,
                         )
                         Text(
@@ -300,7 +300,7 @@ fun HistoryScreen(
                                 formatDuration(ride.durationSec),
                                 Units.speedText(ride.avgSpeedKmh, units),
                             ),
-                            style = MaterialTheme.typography.caption,
+                            style = AppType.caption,
                             color = palette.textTertiary,
                         )
                     }
@@ -356,7 +356,7 @@ fun HistoryScreen(
                         if (!loading && trackPoints.isEmpty()) {
                             Text(
                                 stringResource(R.string.history_no_track),
-                                style = MaterialTheme.typography.body,
+                                style = AppType.body,
                                 color = palette.textTertiary,
                                 modifier = Modifier.align(Alignment.Center),
                             )
@@ -382,11 +382,11 @@ private fun Stat(label: String, value: String, unit: String) {
     val palette = AppTheme.palette
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Row(verticalAlignment = Alignment.Bottom) {
-            Text(value, style = MaterialTheme.typography.display, color = palette.textPrimary)
+            Text(value, style = AppType.display, color = palette.textPrimary)
             Spacer(Modifier.width(2.dp))
-            Text(unit, style = MaterialTheme.typography.caption, color = palette.textTertiary)
+            Text(unit, style = AppType.caption, color = palette.textTertiary)
         }
-        Text(label, style = MaterialTheme.typography.caption, color = palette.textSecondary)
+        Text(label, style = AppType.caption, color = palette.textSecondary)
     }
 }
 
@@ -433,7 +433,7 @@ private fun RideCard(
             Column(Modifier.weight(1f)) {
                 Text(
                     Units.distanceText(ride.distanceKm, units),
-                    style = MaterialTheme.typography.subtitle,
+                    style = AppType.subtitle,
                     color = palette.textPrimary,
                 )
                 Spacer(Modifier.height(2.dp))
@@ -445,10 +445,10 @@ private fun RideCard(
                 Spacer(Modifier.height(2.dp))
                 Text(
                     facts + if (ride.avgHeartRateBpm > 0) hrSuffix else "",
-                    style = MaterialTheme.typography.caption,
+                    style = AppType.caption,
                     color = palette.textSecondary,
                 )
-                Text(dateText, style = MaterialTheme.typography.caption, color = palette.textTertiary)
+                Text(dateText, style = AppType.caption, color = palette.textTertiary)
             }
             IconButton(onClick = onDelete) {
                 Icon(
@@ -468,7 +468,7 @@ private fun MiniFact(icon: ImageVector, text: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(icon, contentDescription = null, tint = palette.textTertiary, modifier = Modifier.size(13.dp))
         Spacer(Modifier.width(4.dp))
-        Text(text, style = MaterialTheme.typography.caption, color = palette.textSecondary)
+        Text(text, style = AppType.caption, color = palette.textSecondary)
     }
 }
 
@@ -487,7 +487,7 @@ private fun LapStrip(laps: List<LapSplit>, units: UnitSystem) {
             Spacer(Modifier.width(Space.xs))
             Text(
                 stringResource(R.string.laps_title),
-                style = MaterialTheme.typography.caption,
+                style = AppType.caption,
                 color = palette.textSecondary,
             )
         }
@@ -513,23 +513,23 @@ private fun LapChip(lap: LapSplit, units: UnitSystem) {
             Text(
                 stringResource(R.string.lap_number, lap.index) +
                     if (lap.isComplete) "" else " · " + stringResource(R.string.lap_in_progress),
-                style = MaterialTheme.typography.caption,
+                style = AppType.caption,
                 color = if (lap.isComplete) palette.textSecondary else palette.primary,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
                 Units.distanceText(lap.distanceKm, units),
-                style = MaterialTheme.typography.label,
+                style = AppType.label,
                 color = palette.textPrimary,
             )
             Text(
                 formatDuration(lap.durationSec),
-                style = MaterialTheme.typography.caption,
+                style = AppType.caption,
                 color = palette.textTertiary,
             )
             Text(
                 Units.speedText(lap.avgSpeedKmh, units),
-                style = MaterialTheme.typography.caption,
+                style = AppType.caption,
                 color = palette.textSecondary,
             )
         }
