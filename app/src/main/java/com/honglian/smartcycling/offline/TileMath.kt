@@ -2,6 +2,7 @@ package com.honglian.smartcycling.offline
 
 import kotlin.math.PI
 import kotlin.math.atan
+import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.ln
 import kotlin.math.sinh
@@ -18,6 +19,14 @@ import kotlin.math.tan
  */
 object TileMath {
 
+    /**
+     * Web Mercator 的纬度上限,**精确值**(= `degrees(atan(sinh(PI)))` ≈ 85.05112877980659°)。
+     *
+     * 不要写成四舍五入的 `85.05112878`:它比精确值大 1.9e-10 度,虽然小到可以忽略,
+     * 但正好把"理论上恰好落在 y = 0 的边界纬度"推到边界**之外** —— 见 [latToTileY] 的说明。
+     */
+    private const val MAX_MERCATOR_LAT = 85.05112877980659
+
     fun tilesPerAxis(zoom: Int): Double = Math.pow(2.0, zoom.toDouble())
 
     /** 经度 → 瓦片列号(可能越界,调用方自行裁剪)。 */
@@ -26,12 +35,16 @@ object TileMath {
         return floor((lon + 180.0) / 360.0 * n).toInt()
     }
 
-    /** 纬度 → 瓦片行号(Web Mercator,已对极区做裁剪)。 */
+    /** 纬度 → 瓦片行号(Web Mercator,已对极区做裁剪,结果保证落在 `0 until limit(zoom)`)。 */
     fun latToTileY(lat: Double, zoom: Int): Int {
         val n = tilesPerAxis(zoom)
-        val clamped = lat.coerceIn(-85.05112878, 85.05112878)
-        val rad = clamped * PI / 180.0
-        return floor((1.0 - ln(tan(rad) + 1.0 / kotlin.math.cos(rad)) / PI) / 2.0 * n).toInt()
+        val rad = lat.coerceIn(-MAX_MERCATOR_LAT, MAX_MERCATOR_LAT) * PI / 180.0
+        val y = floor((1.0 - ln(tan(rad) + 1.0 / cos(rad)) / PI) / 2.0 * n).toInt()
+        // 边界纬度(±85.0511…)在数学上正好落在 y = 0 / y = n-1,
+        // 但浮点误差会让中间量变成 -1e-10 这种"负零",floor() 于是取到 -1(另一端则是 n)。
+        // 拿这个行号去请求瓦片就是越界,所以必须兜底裁剪。
+        // (实测:lat=89.9 / zoom=4 时,不裁剪会得到 y=-1。)
+        return y.coerceIn(0, limit(zoom) - 1)
     }
 
     /** 瓦片列号 → 瓦片**左边界**经度。 */
