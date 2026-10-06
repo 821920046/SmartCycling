@@ -20,14 +20,17 @@
 ---
 
 开屏自动配对**迈金 S314** 蓝牙速度/踏频传感器 → 进入地图 → 输入目的地开骑 → 横屏数据界面(左导航 / 右仪表盘)。
-支持**导入各大平台的离线地图**并在无网环境下导航。
+支持**导入各大平台的离线地图**并在无网环境下导航,支持**心率带**与**GPX 轨迹导入导出**。
 
 ## 核心能力
 
 - 🗺️ **双地图引擎** — 在线走高德(路线规划 / POI 搜索 / 语音播报),离线走 osmdroid 本地瓦片,一键切换
 - 📦 **离线地图导入** — 支持 MBTiles / ZIP 瓦片包 / `{z}/{x}/{y}` 瓦片文件夹 / osmdroid SQLite,并自动识别元数据
 - 🧭 **坐标系纠偏** — 内建 WGS-84 / GCJ-02 / BD-09 互转,导入高德、腾讯、百度瓦片也能与 GPS 精准对齐
-- 🤖 **智能分析** — 速度 / 踏频 / 里程 / 时长 / 均速实时计算与历史统计
+- ❤️ **心率带支持** — 标准 BLE HRS(0x180D),自动识别/记忆回连,实时 + 平均 + 最大心率,与速度/踏频传感器互相独立
+- 🛤️ **GPX 导入导出** — 骑行记录导出为 GPX 1.1(WGS-84,含高程),可直接导入 Strava / Komoot / Google Earth;也能导入他人的 GPX 路线直接导航
+- 🏆 **个人纪录** — 最远单次 / 最快均速 / 最长时长 / 最大爬升
+- 🤖 **智能分析** — 速度 / 踏频 / 里程 / 时长 / 均速 / 热量 / 爬升实时计算与历史统计
 - 🎨 **双主题设计系统** — 浅色为主(户外日光可读),深色适配夜骑,可跟随系统
 - 🛡️ **安全守护** — 前台服务锁屏保活,骑行中数据不中断
 
@@ -35,10 +38,11 @@
 
 - Kotlin 1.9 + Jetpack Compose + Material3
 - MVVM + Repository + 轻量 DI(`core/Container`)
-- Nordic Android-BLE-Library(`ble-ktx`)接入 CSC(0x1816 / 0x2A5B)
-- FusedLocationProvider 定位与里程积分
-- Room 本地存储骑行记录、轨迹与离线地图注册表
+- Nordic Android-BLE-Library(`ble-ktx`)接入 CSC(0x1816 / 0x2A5B)与 HRS(0x180D / 0x2A37)
+- 高德定位(AMapLocation)融合定位与里程积分
+- Room 本地存储骑行记录、轨迹(含海拔/心率)与离线地图注册表
 - **osmdroid 6.1.20** 离线栅格瓦片渲染(Apache-2.0)
+- GPX 1.1 读写:JDK 自带 DOM 解析器,零第三方依赖
 - Foreground Service 锁屏保活
 
 ## 目录结构
@@ -48,17 +52,18 @@ app/src/main/java/com/honglian/smartcycling/
 ├─ SmartCyclingApp.kt        # Application + 通知渠道 + osmdroid 初始化
 ├─ MainActivity.kt           # 权限、自动配对、横屏切换、前台服务、主题注入
 ├─ core/                     # 轻量依赖容器 / 设置 / 主题模式 / 车轮预设
-├─ ble/                      # CSC UUID / 解析 / 计算 / S314 BleManager
-├─ pairing/                  # 扫描与自动配对
+├─ ble/                      # CSC + HRS UUID / 解析 / 计算 / BleManager
+├─ pairing/                  # 扫描与自动配对(CSC 与心率带双通道)
 ├─ location/                 # GPS 轨迹与速度
 ├─ data/                     # Room 实体 / DAO / 仓库(含离线地图注册表)
+├─ export/                   # GPX 读写 / 骑行记录导出 / 分享
 ├─ ride/                     # RideState / RideViewModel / RideService
-├─ map/                      # 高德在线引擎(搜索 / 反查 / 路径规划)
+├─ map/                      # 高德在线引擎(搜索 / 反查 / 路径规划 / GPX 路线导入)
 ├─ offline/                  # 离线引擎:坐标变换 / 格式探测 / 瓦片源 / Compose 视图
 ├─ ui/theme/                 # 设计系统:色板 / 排版 / 间距 / 形状
 ├─ ui/components/            # SpeedRing / DataGrid / 地图视图
 ├─ ui/screens/               # Pairing / Map / Ride / History / Settings / OfflineMaps
-└─ nav/AppNav.kt             # 配对→地图→骑行→设置/历史/离线地图
+└─ nav/AppNav.kt             # 配对→地图→骑行→成绩→设置/历史/离线地图
 ```
 
 ## 离线地图使用指南
@@ -106,6 +111,41 @@ app/src/main/java/com/honglian/smartcycling/
 > osmdroid 的 `TileSystem` 接口是**一维可分离**的,强行套用只能取常数近似,
 > 误差可达数十米。详见 `REVIEW.md`。
 
+## GPX 轨迹导入 / 导出
+
+### 导出
+
+| 入口 | 行为 |
+|---|---|
+| 骑行结束页 →「💾 导出 GPX 轨迹」 | 拉起系统分享面板(Strava / Komoot / 微信 / 邮件 / 保存到文件) |
+| 历史页 → 点开某次骑行 → 右上角 ⬇ | 走 SAF,自选保存位置 |
+| 历史页 → 右上角 ⬇ | 导出**全部**骑行(一个文件内多条 `<trk>`) |
+
+导出的文件为 **GPX 1.1**,包含 `lat/lon`、`<ele>` 高程与 `<time>` 时间戳。
+
+> **为什么导出的是 WGS-84?** 应用内部所有高德坐标都是 GCJ-02(火星坐标),而 GPX 是国际格式,
+> 行业约定用 WGS-84。导出前统一纠偏(`RideGpx.fromRide`),否则轨迹导进 Strava / Google Earth
+> 会整体偏移 300~600 米 —— 表现为"在自己软件里看着对,放到别的软件里就偏了"。
+
+### 导入路线
+
+地图页搜索框右侧的 **📂 图标** → 选择 `.gpx` 文件 → 解析为路线并直接导航。
+
+兼容 `<trkpt>`(轨迹)/ `<rtept>`(路线)/ `<wpt>`(航点)三种点标签,因此
+Garmin Connect、行者、黑鸟、Komoot、Strava 等导出的文件都能直接吃。
+导入后按 **WGS-84 → GCJ-02** 纠偏后交给高德导航引擎。
+
+## 心率带(BLE HRS)
+
+标准蓝牙心率带(`0x180D` / `0x2A37` 测量特征)即插即用:
+
+- 配对页扫描时自动识别并静默连接,不阻塞速度/踏频传感器的配对流程;
+- 连接过一次后会**记住 MAC 地址**,下次开机扫描到即自动回连;
+- 骑行中数据页自动多出一行「实时心率 / 平均心率」,成绩页与历史卡片同步展示;
+- 未连接心率带时,相关 UI 完全不出现,不影响任何原有指标。
+
+> 心率带与速度/踏频传感器是**两条互相独立的 BLE 连接**,任一掉线不影响另一路。
+
 ## 构建
 
 > 本仓未附带 `gradle-wrapper.jar`(二进制)。首次构建任选一:
@@ -125,6 +165,9 @@ app/src/main/java/com/honglian/smartcycling/
 4. **里程优先 GPS 积分**(过滤 >25m 精度与 <1m 静止漂移);无定位时用轮转圈数 × 轮周长回退。
 5. **离线地图必须换引擎**:高德 SDK 封闭、不开放自定义瓦片源,因此离线能力只能由独立开源引擎承载。
 6. **坐标系在瓦片层纠偏**,而非投影层(见上)。
+7. **GPX 导出必须纠到 WGS-84**:国际格式用 WGS-84,应用内部用 GCJ-02,不纠偏则跨软件偏移 300~600 米。
+8. **心率带与 CSC 分属两个 BleManager**:两路独立连接,避免"心率带掉线把速度踏频一起拖垮"。
+9. **GPX 解析关掉 DTD/外部实体**:防 XXE —— GPX 是用户从外部拿来的文件,属于不可信输入。
 
 ## 开源合规
 

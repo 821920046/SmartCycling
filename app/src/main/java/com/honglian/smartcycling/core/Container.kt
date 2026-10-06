@@ -1,6 +1,7 @@
 package com.honglian.smartcycling.core
 
 import android.content.Context
+import com.honglian.smartcycling.ble.HeartRateManager
 import com.honglian.smartcycling.ble.S314Manager
 import com.honglian.smartcycling.cloud.CloudSyncRepository
 import com.honglian.smartcycling.data.AppDatabase
@@ -30,6 +31,10 @@ class Container(context: Context) {
     val sensorManager: S314Manager by lazy {
         S314Manager(appContext).apply { wheelCircumferenceM = settings.wheelCircumferenceM }
     }
+
+    /** 标准 BLE 心率带(可选外设)。与速度/踏频传感器是两条独立连接。 */
+    val heartRateManager: HeartRateManager by lazy { HeartRateManager(appContext) }
+
     val pairingRepository: PairingRepository by lazy { PairingRepository(appContext) }
     val locationTracker: LocationTracker by lazy { LocationTracker(appContext) }
 }

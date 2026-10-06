@@ -29,6 +29,7 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
 
     private val container = (app as SmartCyclingApp).container
     private val sensor = container.sensorManager
+    private val heartRate = container.heartRateManager
     private val location = container.locationTracker
     private val repository = container.rideRepository
     private val cloudSync = container.cloudSyncRepository
@@ -48,6 +49,10 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
     /** 最近一次完成骑行的成绩快照,用于结束后成绩总结页展示。 */
     private val _lastSummary = MutableStateFlow<RideState?>(null)
     val lastSummary: StateFlow<RideState?> = _lastSummary.asStateFlow()
+
+    /** 最近一次落库的骑行 id;用于成绩页一键导出 GPX(此时才拿得到轨迹点)。 */
+    private val _lastSavedRideId = MutableStateFlow<Long?>(null)
+    val lastSavedRideId: StateFlow<Long?> = _lastSavedRideId.asStateFlow()
 
     private var rideJob: Job? = null
     private val trackPoints = mutableListOf<TrackPointEntity>()
@@ -75,6 +80,13 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
     private var autoPauseThresholdKmh = 1.5
     private var riderWeightKg = 65.0
 
+    // 心率(可选外设):实时值、均值累计与最大值
+    private var heartRateBpm = 0
+    private var lastHrAt = 0L
+    private var hrSum = 0L
+    private var hrCount = 0L
+    private var maxHeartRate = 0
+
     fun startRide() {
         if (_state.value.isRiding) return
         startTime = System.currentTimeMillis()
@@ -87,6 +99,11 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
         elevationGain = 0.0
         caloriesKcal = 0.0
         lastAltitude = null
+        heartRateBpm = 0
+        lastHrAt = 0L
+        hrSum = 0L
+        hrCount = 0L
+        maxHeartRate = 0
         autoPauseEnabled = settings.autoPauseEnabled
         autoPauseThresholdKmh = settings.autoPauseThresholdKmh.toDouble()
         riderWeightKg = settings.riderWeightKg.toDouble()
@@ -95,9 +112,10 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
         _state.value = RideState(isRiding = true, isPaused = false)
 
         rideJob = viewModelScope.launch {
-            // 采集协程兜底：任一数据源(传感器/GPS/计时)抛异常都只在本协程内消化，
+            // 采集协程兜底：任一数据源(传感器/GPS/心率/计时)抛异常都只在本协程内消化，
             // 绝不冒泡到 viewModelScope 触发未捕获异常导致整个 App 闪退。
             launch { try { collectSensor() } catch (c: CancellationException) { throw c } catch (t: Throwable) {} }
+            launch { try { collectHeartRate() } catch (c: CancellationException) { throw c } catch (t: Throwable) {} }
             launch { try { collectLocation() } catch (c: CancellationException) { throw c } catch (t: Throwable) {} }
             launch { try { ticker() } catch (c: CancellationException) { throw c } catch (t: Throwable) {} }
         }
@@ -157,7 +175,24 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
                 longitude = sample.longitude,
                 speedKmh = sample.speedKmh,
                 timestampMs = sample.timestampMs,
+                elevationM = if (alt == 0.0) 0.0 else alt,
             )
+        }
+    }
+
+    /**
+     * 采集标准 BLE 心率带读数。
+     * 心率带是可选外设:未连接时该流恒为 0,不会影响任何其它指标。
+     */
+    private suspend fun collectHeartRate() {
+        heartRate.bpm.collect { bpm ->
+            if (_state.value.isPaused) return@collect
+            if (bpm <= 0) return@collect
+            heartRateBpm = bpm
+            lastHrAt = System.currentTimeMillis()
+            if (bpm > maxHeartRate) maxHeartRate = bpm
+            hrSum += bpm
+            hrCount++
         }
     }
 
@@ -225,6 +260,11 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
             val distKm = distanceMeters / 1000.0
             val avg = if (accumulatedDurationSec > 0) distKm / (accumulatedDurationSec / 3600.0) else 0.0
 
+            // 心率:与其它传感器一致做"陈旧检测",掉线后自动归零,避免读数卡在最后一次值。
+            val hrFresh = lastHrAt > 0L && now - lastHrAt < HR_STALE_MS
+            val curHr = if (hrFresh && !nextPaused) heartRateBpm else 0
+            val avgHr = if (hrCount > 0) hrSum.toDouble() / hrCount else 0.0
+
             _state.value = stateVal.copy(
                 speedKmh = if (nextPaused) 0.0 else rawSpeed,
                 cadenceRpm = if (nextPaused) 0.0 else curCadence,
@@ -237,6 +277,10 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
                 speedSource = if (useSensor) SpeedSource.SENSOR_WHEEL else SpeedSource.GPS,
                 calories = caloriesKcal,
                 elevationGainM = elevationGain,
+                heartRateBpm = curHr,
+                avgHeartRateBpm = avgHr,
+                maxHeartRateBpm = maxHeartRate,
+                hasHeartRate = hrFresh,
                 sensorFresh = sensorFresh,
                 isPaused = nextPaused
             )
@@ -248,6 +292,7 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
         rideJob = null
         val s = _state.value
         _state.value = s.copy(isRiding = false, isPaused = false)
+        _lastSavedRideId.value = null
         // 捕获成绩快照(时长过短视为误触发,不生成成绩)
         _lastSummary.value = if (s.durationSec < 3) null else s
         if (s.durationSec < 3) return  // 忽略误触发
@@ -263,8 +308,11 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
                 avgCadenceRpm = s.avgCadenceRpm,
                 calories = s.calories,
                 elevationGainM = s.elevationGainM,
+                avgHeartRateBpm = s.avgHeartRateBpm,
+                maxHeartRateBpm = s.maxHeartRateBpm,
             )
             val id = repository.saveRide(ride, pointsSnapshot)
+            _lastSavedRideId.value = id
             // 自动上传云端中控(仅本地模式下不联网上传)
             if (!settings.localOnlyMode) runCatching {
                 cloudSync.upload(
@@ -282,6 +330,8 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
 
     companion object {
         private const val STALE_MS = 3000L
+        /** 心率带心跳间隔较长,用更宽松的陈旧阈值(5s),避免正常漏帧被误判为掉线。 */
+        private const val HR_STALE_MS = 5000L
     }
 }
 

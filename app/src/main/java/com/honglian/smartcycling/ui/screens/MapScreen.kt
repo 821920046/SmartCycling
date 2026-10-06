@@ -1,5 +1,8 @@
 package com.honglian.smartcycling.ui.screens
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -26,6 +29,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.DirectionsBike
+import androidx.compose.material.icons.outlined.FileOpen
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Map
 import androidx.compose.material.icons.outlined.Place
@@ -105,6 +109,7 @@ fun MapScreen(
     currentLocation: LatLng? = null,
     onSwitchSource: (MapSource) -> Unit = {},
     onSelectMapType: (Int) -> Unit = {},
+    onImportRoute: (Uri) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val palette = AppTheme.palette
@@ -113,6 +118,11 @@ fun MapScreen(
     var showLayerDialog by remember { mutableStateOf(false) }
     val focus = LocalFocusManager.current
     val distanceKm = remember(routePoints) { routeDistanceKm(routePoints) }
+
+    // 从其它软件(行者/Strava/Garmin Connect/Komoot…)导出的 GPX 路线直接导入导航。
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri: Uri? -> uri?.let(onImportRoute) }
 
     Box(modifier.fillMaxSize().background(palette.background)) {
         // 1) 底图
@@ -236,6 +246,19 @@ fun MapScreen(
                         },
                     )
                     Spacer(Modifier.weight(1f))
+                    IconChip(Icons.Outlined.FileOpen) {
+                        runCatching {
+                            importLauncher.launch(
+                                arrayOf(
+                                    "application/gpx+xml",
+                                    "application/xml",
+                                    "text/xml",
+                                    "application/octet-stream",
+                                    "*/*",
+                                ),
+                            )
+                        }
+                    }
                     IconChip(Icons.Outlined.DirectionsBike) { showWheelDialog = true }
                     IconChip(Icons.Outlined.Tune) { showLayerDialog = true }
                 }

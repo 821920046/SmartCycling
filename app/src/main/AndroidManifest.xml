@@ -60,6 +60,17 @@
             android:foregroundServiceType="location"
             android:exported="false" />
 
+        <!-- 导出 GPX 轨迹时的文件共享通道(cache/gpx → content://) -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
         <!-- 高德地图 / 定位 -->
         <meta-data
             android:name="com.amap.api.v2.apikey"

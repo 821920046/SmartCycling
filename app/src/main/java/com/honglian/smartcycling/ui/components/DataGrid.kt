@@ -90,6 +90,41 @@ fun DataGrid(state: RideState, modifier: Modifier = Modifier) {
             VerticalDivider(color = DividerNavy)
             DataCell(Modifier.weight(1f), "⛰ %.0f m".format(state.elevationGainM), "累计爬升")
         }
+        // 心率带为可选外设:未连接时不占用版面,连接后自动展开一行。
+        if (state.hasHeartRate) {
+            HorizontalDivider(color = DividerNavy)
+            Row(Modifier.fillMaxWidth()) {
+                DataCell(Modifier.weight(1f), "❤ %d bpm".format(state.heartRateBpm), "实时心率")
+                VerticalDivider(color = DividerNavy)
+                DataCell(Modifier.weight(1f), "❤ %.0f bpm".format(state.avgHeartRateBpm), "平均心率")
+            }
+        }
+    }
+}
+
+/**
+ * 底部两栏小指标:大数值 + 小标签,水平居中。
+ * (原先该函数在合并开发线时丢失,导致 DataGrid 无法编译,此处补回。)
+ */
+@Composable
+private fun DataCell(modifier: Modifier, text: String, label: String) {
+    val palette = AppTheme.palette
+    Column(
+        modifier.padding(vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = text,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+            color = palette.hudValue,
+        )
+        Spacer(Modifier.height(2.dp))
+        Text(
+            text = label,
+            fontSize = 11.sp,
+            color = palette.hudLabel,
+        )
     }
 }
 

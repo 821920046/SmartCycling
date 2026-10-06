@@ -27,6 +27,9 @@ interface RideDao {
     @Query("SELECT * FROM rides ORDER BY startedAt DESC")
     fun observeRides(): Flow<List<RideEntity>>
 
+    @Query("SELECT * FROM rides WHERE id = :rideId")
+    suspend fun ride(rideId: Long): RideEntity?
+
     @Query("SELECT * FROM track_points WHERE rideId = :rideId ORDER BY timestampMs ASC")
     suspend fun trackPoints(rideId: Long): List<TrackPointEntity>
 

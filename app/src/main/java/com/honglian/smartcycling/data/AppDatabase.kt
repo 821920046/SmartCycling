@@ -9,7 +9,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [RideEntity::class, TrackPointEntity::class, OfflineMapEntity::class],
-    version = 3,
+    version = 4,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -61,6 +61,23 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v3 → v4:为 rides 表新增心率列、为 track_points 新增海拔列。
+         *
+         * - 心率:可选外设(标准 BLE 心率带),未连接时为 0。
+         * - 海拔:来自 GPS 高程,用于 GPX 导出与爬升回放。
+         *
+         * 三列均为 `NOT NULL DEFAULT 0`,与实体上的 `@ColumnInfo(defaultValue = "0")` 严格对应,
+         * 否则 Room 的迁移后 schema 校验会失败。
+         */
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE rides ADD COLUMN avgHeartRateBpm REAL NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE rides ADD COLUMN maxHeartRateBpm INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE track_points ADD COLUMN elevationM REAL NOT NULL DEFAULT 0")
+            }
+        }
+
         @Volatile
         private var instance: AppDatabase? = null
 
@@ -71,7 +88,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "smart_cycling.db",
                 )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 // 兜底:未来若再忘记写迁移,至少不会因 schema 不匹配而直接崩溃。
                 .fallbackToDestructiveMigration()
                 .build().also { instance = it }

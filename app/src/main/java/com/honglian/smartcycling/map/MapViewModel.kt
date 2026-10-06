@@ -1,10 +1,12 @@
 package com.honglian.smartcycling.map
 
 import android.app.Application
+import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.amap.api.maps.model.LatLng
 import com.honglian.smartcycling.SmartCyclingApp
+import com.honglian.smartcycling.export.GpxFormat
 import com.honglian.smartcycling.offline.GeoTransform
 import com.honglian.smartcycling.offline.MapCrs
 import kotlinx.coroutines.Job
@@ -159,6 +161,43 @@ class MapViewModel(app: Application) : AndroidViewModel(app) {
     private fun finish(status: String) {
         _status.value = status
         _planning.value = false
+    }
+
+    /**
+     * 从用户选定的 GPX 文件导入一条路线并直接用于导航。
+     *
+     * 坐标系(关键):GPX 是国际格式,内容为 **WGS-84**;而高德底图/导航引擎吃 **GCJ-02**。
+     * 因此必须整体做一次 WGS-84 → GCJ-02 纠偏,否则导入的路线会整体偏移 300~600 米,
+     * 表现为"路线画在隔壁街道上、导航一路报偏航"。
+     */
+    fun importRoute(uri: Uri) {
+        viewModelScope.launch {
+            _suggestions.value = emptyList()
+            _planning.value = true
+            _status.value = "正在读取 GPX 文件…"
+
+            val track = runCatching {
+                val xml = getApplication<Application>().contentResolver
+                    .openInputStream(uri)
+                    ?.use { it.readBytes().toString(Charsets.UTF_8) }
+                    .orEmpty()
+                GpxFormat.parse(xml)
+            }.getOrNull()
+
+            if (track == null || track.points.size < 2) {
+                finish("GPX 解析失败,或轨迹点不足(至少需要 2 个点)")
+                return@launch
+            }
+
+            val gcj = track.points.map {
+                val g = GeoTransform.convert(it.latitude, it.longitude, MapCrs.WGS84, MapCrs.GCJ02)
+                LatLng(g[0], g[1])
+            }
+            _route.value = gcj
+            _startPoint.value = gcj.first()
+            _destination.value = gcj.last()
+            finish("已导入「${track.name}」共 ${gcj.size} 个点,可直接开始骑行")
+        }
     }
 
     companion object {

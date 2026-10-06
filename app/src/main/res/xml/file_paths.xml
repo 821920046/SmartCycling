@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  FileProvider 可共享目录白名单。
+  仅暴露 cache/gpx(导出的 GPX 轨迹临时文件),遵循最小权限原则 ——
+  不暴露 files/、不暴露外部存储,避免无意中把内部数据共享出去。
+-->
+<paths>
+    <cache-path name="gpx" path="gpx/" />
+</paths>

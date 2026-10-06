@@ -19,6 +19,14 @@ data class RideState(
     val speedSource: SpeedSource = SpeedSource.GPS,
     val calories: Double = 0.0,
     val elevationGainM: Double = 0.0,
+    /** 实时心率(bpm);未连接心率带或数据过期时为 0。 */
+    val heartRateBpm: Int = 0,
+    /** 本次骑行平均心率(bpm);无心率数据时为 0。 */
+    val avgHeartRateBpm: Double = 0.0,
+    /** 本次骑行最大心率(bpm);无心率数据时为 0。 */
+    val maxHeartRateBpm: Int = 0,
+    /** 是否正在收到有效心率数据(决定界面是否展示心率行)。 */
+    val hasHeartRate: Boolean = false,
     val sensorFresh: Boolean = false,
     val isRiding: Boolean = false,
     val isPaused: Boolean = false,

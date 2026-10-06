@@ -1,5 +1,6 @@
 package com.honglian.smartcycling.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -16,8 +17,20 @@ data class RideEntity(
     val avgSpeedKmh: Double,
     val maxSpeedKmh: Double,
     val avgCadenceRpm: Double,
+    // 注意:以下两个字段是 v1→v2 迁移时用 `ADD COLUMN ... DEFAULT 0` 加的,当时未标注
+    // defaultValue。为不改动既有设备上的实际 schema(避免校验不一致),这里保持原样不动。
     val calories: Double = 0.0,
     val elevationGainM: Double = 0.0,
+    /**
+     * 平均心率(bpm);未连接心率带时为 0。
+     *
+     * 标注 `defaultValue = "0"` 是**必需**的:新增列只能以
+     * `ALTER TABLE ... ADD COLUMN ... NOT NULL DEFAULT 0` 方式加入,
+     * 若实体不声明同样的默认值,Room 的 schema 校验会判定迁移未正确执行而抛异常。
+     */
+    @ColumnInfo(defaultValue = "0") val avgHeartRateBpm: Double = 0.0,
+    /** 最大心率(bpm);未连接心率带时为 0。 */
+    @ColumnInfo(defaultValue = "0") val maxHeartRateBpm: Int = 0,
 )
 
 /** 轨迹点,关联到具体骑行。 */
@@ -40,4 +53,6 @@ data class TrackPointEntity(
     val longitude: Double,
     val speedKmh: Double,
     val timestampMs: Long,
+    /** 海拔(米,来自 GPS 高程);0 表示无效值。用于 GPX 导出与爬升回放。 */
+    @ColumnInfo(defaultValue = "0") val elevationM: Double = 0.0,
 )

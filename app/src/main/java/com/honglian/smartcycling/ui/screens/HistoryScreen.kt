@@ -1,5 +1,8 @@
 package com.honglian.smartcycling.ui.screens
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -25,6 +28,8 @@ import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DirectionsBike
+import androidx.compose.material.icons.outlined.EmojiEvents
+import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material3.AlertDialog
@@ -55,6 +60,7 @@ import com.amap.api.maps.model.LatLng
 import com.honglian.smartcycling.core.MapSource
 import com.honglian.smartcycling.data.RideEntity
 import com.honglian.smartcycling.data.TrackPointEntity
+import com.honglian.smartcycling.export.RideExporter
 import com.honglian.smartcycling.offline.OfflineLayerSpec
 import com.honglian.smartcycling.offline.OfflineMapView
 import com.honglian.smartcycling.offline.toWgs84
@@ -77,6 +83,8 @@ fun HistoryScreen(
     mapType: Int = 3,
     mapSource: MapSource = MapSource.ONLINE,
     offlineSpec: OfflineLayerSpec? = null,
+    onExportRide: (RideEntity, Uri) -> Unit = { _, _ -> },
+    onExportAll: (Uri) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val palette = AppTheme.palette
@@ -87,8 +95,32 @@ fun HistoryScreen(
     var trackPoints by remember { mutableStateOf<List<LatLng>>(emptyList()) }
     var loading by remember { mutableStateOf(false) }
 
+    // —— GPX 导出(SAF,用户自选保存位置) ——
+    var pendingRide by remember { mutableStateOf<RideEntity?>(null) }
+    var pendingAll by remember { mutableStateOf(false) }
+    val exportRideLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument(RideExporter.MIME_GPX),
+    ) { uri: Uri? ->
+        val ride = pendingRide
+        pendingRide = null
+        if (uri != null && ride != null) onExportRide(ride, uri)
+    }
+    val exportAllLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument(RideExporter.MIME_GPX),
+    ) { uri: Uri? ->
+        val all = pendingAll
+        pendingAll = false
+        if (uri != null && all) onExportAll(uri)
+    }
+
     val totalDistance = remember(rides) { rides.sumOf { it.distanceKm } }
     val totalDuration = remember(rides) { rides.sumOf { it.durationSec } }
+
+    // 个人纪录:从已有记录里取各项极值(参考 Strava / OpenTracks 的 PR 展示)
+    val prDistance = remember(rides) { rides.maxOfOrNull { it.distanceKm } ?: 0.0 }
+    val prSpeed = remember(rides) { rides.maxOfOrNull { it.avgSpeedKmh } ?: 0.0 }
+    val prDuration = remember(rides) { rides.maxOfOrNull { it.durationSec } ?: 0L }
+    val prElevation = remember(rides) { rides.maxOfOrNull { it.elevationGainM } ?: 0.0 }
 
     Box(
         modifier = modifier
@@ -113,6 +145,18 @@ fun HistoryScreen(
                     color = palette.textPrimary,
                     modifier = Modifier.weight(1f),
                 )
+                if (rides.isNotEmpty()) {
+                    IconButton(onClick = {
+                        pendingAll = true
+                        runCatching { exportAllLauncher.launch("SmartCycling-all.gpx") }
+                    }) {
+                        Icon(
+                            Icons.Outlined.FileDownload,
+                            contentDescription = "导出全部 GPX",
+                            tint = palette.textSecondary,
+                        )
+                    }
+                }
             }
 
             Column(Modifier.padding(horizontal = Space.lg)) {
@@ -131,6 +175,43 @@ fun HistoryScreen(
                         Stat("累计里程", "%.1f".format(totalDistance), "km")
                         Stat("骑行次数", "${rides.size}", "次")
                         Stat("累计时长", "%.1f".format(totalDuration / 3600.0), "h")
+                    }
+                }
+
+                if (rides.isNotEmpty()) {
+                    Spacer(Modifier.height(Space.md))
+                    Surface(
+                        shape = RoundedCornerShape(Radius.lg),
+                        color = palette.surface,
+                        border = BorderStroke(1.dp, palette.outline),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Column(Modifier.padding(Space.md)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Outlined.EmojiEvents,
+                                    contentDescription = null,
+                                    tint = palette.primary,
+                                    modifier = Modifier.size(16.dp),
+                                )
+                                Spacer(Modifier.width(Space.xs))
+                                Text(
+                                    "个人纪录",
+                                    style = MaterialTheme.typography.subtitle,
+                                    color = palette.textPrimary,
+                                )
+                            }
+                            Spacer(Modifier.height(Space.sm))
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                                Stat("最远单次", "%.1f".format(prDistance), "km")
+                                Stat("最快均速", "%.1f".format(prSpeed), "km/h")
+                            }
+                            Spacer(Modifier.height(Space.sm))
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                                Stat("最长时长", formatDuration(prDuration), "")
+                                Stat("最大爬升", "%.0f".format(prElevation), "m")
+                            }
+                        }
                     }
                 }
                 Spacer(Modifier.height(Space.md))
@@ -205,6 +286,16 @@ fun HistoryScreen(
                             ),
                             style = MaterialTheme.typography.caption,
                             color = palette.textTertiary,
+                        )
+                    }
+                    IconButton(onClick = {
+                        pendingRide = ride
+                        runCatching { exportRideLauncher.launch(RideExporter.fileName(ride.startedAt)) }
+                    }) {
+                        Icon(
+                            Icons.Outlined.FileDownload,
+                            contentDescription = "导出 GPX",
+                            tint = palette.primary,
                         )
                     }
                     IconButton(onClick = { activeRide = null }) {
@@ -321,7 +412,10 @@ private fun RideCard(
                 }
                 Spacer(Modifier.height(2.dp))
                 Text(
-                    "%.0f kcal · 爬升 %.0f m".format(ride.calories, ride.elevationGainM),
+                    buildString {
+                        append("%.0f kcal · 爬升 %.0f m".format(ride.calories, ride.elevationGainM))
+                        if (ride.avgHeartRateBpm > 0) append(" · ❤ %.0f".format(ride.avgHeartRateBpm))
+                    },
                     style = MaterialTheme.typography.caption,
                     color = palette.textSecondary,
                 )

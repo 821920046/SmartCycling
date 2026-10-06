@@ -37,6 +37,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Bluetooth
 import androidx.compose.material.icons.outlined.DirectionsBike
+import androidx.compose.material.icons.outlined.Favorite
 import androidx.compose.material.icons.outlined.LocationOff
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.AlertDialog
@@ -91,6 +92,8 @@ fun PairingScreen(
     devices: List<DiscoveredDevice>,
     onConnect: (DiscoveredDevice) -> Unit,
     onStartScan: () -> Unit,
+    hrConnection: ConnectionState = ConnectionState.DISCONNECTED,
+    onSkip: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -171,6 +174,7 @@ fun PairingScreen(
                 }
                 Spacer(Modifier.height(Space.lg))
                 ConnectionStatus(connection)
+                HrStatus(hrConnection)
                 Spacer(Modifier.height(Space.md))
 
                 if (connection == ConnectionState.DISCONNECTED) {
@@ -192,6 +196,15 @@ fun PairingScreen(
                         Icon(Icons.Outlined.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(Space.sm))
                         Text("重新扫描", style = MaterialTheme.typography.subtitle)
+                    }
+                    Spacer(Modifier.height(Space.sm))
+                    // 传感器没电/不在身边时不应把用户卡死在配对页:GPS 本身即可完成基础骑行记录。
+                    TextButton(onClick = onSkip) {
+                        Text(
+                            "跳过,仅用 GPS 记录",
+                            style = MaterialTheme.typography.label,
+                            color = palette.textTertiary,
+                        )
                     }
                 } else {
                     Spacer(Modifier.weight(1f))
@@ -319,6 +332,32 @@ private fun ConnectionStatus(connection: ConnectionState) {
     }
 }
 
+/**
+ * 心率带状态提示。心率带是可选项:未连接时不打扰用户,只给一行弱提示。
+ */
+@Composable
+private fun HrStatus(hrConnection: ConnectionState) {
+    val palette = AppTheme.palette
+    Spacer(Modifier.height(Space.xs))
+    when (hrConnection) {
+        ConnectionState.READY -> Text(
+            "❤ 心率带已连接",
+            style = MaterialTheme.typography.caption,
+            color = palette.success,
+        )
+        ConnectionState.CONNECTING, ConnectionState.DISCONNECTING -> Text(
+            "❤ 心率带连接中…",
+            style = MaterialTheme.typography.caption,
+            color = palette.textSecondary,
+        )
+        ConnectionState.DISCONNECTED -> Text(
+            "❤ 心率带(可选):开启心率带电源即可自动连接",
+            style = MaterialTheme.typography.caption,
+            color = palette.textTertiary,
+        )
+    }
+}
+
 @Composable
 private fun DeviceList(
     devices: List<DiscoveredDevice>,
@@ -352,6 +391,10 @@ private fun DeviceList(
 @Composable
 private fun DeviceRow(device: DiscoveredDevice, onClick: () -> Unit) {
     val palette = AppTheme.palette
+    val tag = buildList {
+        if (device.hasCsc) add("CSC")
+        if (device.hasHrs) add("HR")
+    }.joinToString(" · ").let { if (it.isEmpty()) "" else "  · $it" }
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(Radius.md),
@@ -374,22 +417,33 @@ private fun DeviceRow(device: DiscoveredDevice, onClick: () -> Unit) {
                         .size(36.dp)
                         .clip(CircleShape)
                         .background(
-                            if (device.hasCsc) palette.success.copy(alpha = 0.14f)
-                            else palette.primary.copy(alpha = 0.12f),
+                            when {
+                                device.hasCsc -> palette.success.copy(alpha = 0.14f)
+                                device.hasHrs -> palette.danger.copy(alpha = 0.14f)
+                                else -> palette.primary.copy(alpha = 0.12f)
+                            },
                         ),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        imageVector = if (device.hasCsc) Icons.Outlined.DirectionsBike else Icons.Outlined.Bluetooth,
+                        imageVector = when {
+                            device.hasCsc -> Icons.Outlined.DirectionsBike
+                            device.hasHrs -> Icons.Outlined.Favorite
+                            else -> Icons.Outlined.Bluetooth
+                        },
                         contentDescription = null,
-                        tint = if (device.hasCsc) palette.success else palette.primary,
+                        tint = when {
+                            device.hasCsc -> palette.success
+                            device.hasHrs -> palette.danger
+                            else -> palette.primary
+                        },
                         modifier = Modifier.size(18.dp),
                     )
                 }
                 Spacer(Modifier.width(Space.md))
                 Column {
                     Text(
-                        text = device.name.ifBlank { "未知设备" } + if (device.hasCsc) "  · CSC" else "",
+                        text = device.name.ifBlank { "未知设备" } + tag,
                         style = MaterialTheme.typography.subtitle,
                         color = palette.textPrimary,
                     )

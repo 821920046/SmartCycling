@@ -22,13 +22,14 @@ import com.honglian.smartcycling.ride.RideState
 import com.honglian.smartcycling.ui.theme.*
 
 /**
- * 骑行结束成绩总结页。展示本次骑行关键指标,并支持一键分享。
+ * 骑行结束成绩总结页。展示本次骑行关键指标,并支持一键分享成绩 / 导出 GPX 轨迹。
  * state 为 null(异常进入)时直接展示完成按钮回到地图。
  */
 @Composable
 fun RideSummaryScreen(
     state: RideState?,
     onDone: () -> Unit,
+    onExportGpx: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -69,6 +70,16 @@ fun RideSummaryScreen(
                         StatRow("最高速度", "%.1f km/h".format(state.maxSpeedKmh), "平均踏频", "${state.avgCadenceRpm.toInt()} rpm")
                         HorizontalDivider(color = DividerNavy)
                         StatRow("消耗热量", "%.0f kcal".format(state.calories), "累计爬升", "%.0f m".format(state.elevationGainM))
+                        // 心率带为可选外设:本次有心率数据才多展示一行。
+                        if (state.avgHeartRateBpm > 0.0 || state.maxHeartRateBpm > 0) {
+                            HorizontalDivider(color = DividerNavy)
+                            StatRow(
+                                "平均心率",
+                                "%.0f bpm".format(state.avgHeartRateBpm),
+                                "最大心率",
+                                "%d bpm".format(state.maxHeartRateBpm),
+                            )
+                        }
                     }
                 }
             }
@@ -98,6 +109,14 @@ fun RideSummaryScreen(
                     colors = ButtonDefaults.buttonColors(containerColor = BrandCyan, contentColor = Color(0xFF04121A)),
                 ) {
                     Text("📤 分享成绩", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
+
+                OutlinedButton(
+                    onClick = onExportGpx,
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    shape = RoundedCornerShape(14.dp),
+                ) {
+                    Text("💾 导出 GPX 轨迹", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = BrandCyan)
                 }
             }
 

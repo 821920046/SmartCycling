@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
 import android.content.Context
 import com.honglian.smartcycling.ble.CscUuids
+import com.honglian.smartcycling.ble.HrUuids
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -20,6 +21,8 @@ data class DiscoveredDevice(
     val rssi: Int,
     /** 广播包中是否声明了 CSC 服务(0x1816),用于自动识别骑行传感器。 */
     val hasCsc: Boolean = false,
+    /** 广播包中是否声明了心率服务(0x180D),用于自动识别心率带。 */
+    val hasHrs: Boolean = false,
 )
 
 /**
@@ -47,8 +50,10 @@ class PairingRepository(private val context: Context) {
         val callback = object : ScanCallback() {
             override fun onScanResult(callbackType: Int, result: ScanResult) {
                 val name = result.scanRecord?.deviceName ?: result.device.name.orEmpty()
-                val hasCsc = result.scanRecord?.serviceUuids?.any { it.uuid == CscUuids.SERVICE } == true
-                trySend(DiscoveredDevice(result.device, name, result.rssi, hasCsc))
+                val uuids = result.scanRecord?.serviceUuids
+                val hasCsc = uuids?.any { it.uuid == CscUuids.SERVICE } == true
+                val hasHrs = uuids?.any { it.uuid == HrUuids.SERVICE } == true
+                trySend(DiscoveredDevice(result.device, name, result.rssi, hasCsc, hasHrs))
             }
         }
         scanner.startScan(filters, settings, callback)
@@ -58,4 +63,25 @@ class PairingRepository(private val context: Context) {
     /** 名称含 S314/Magene 则认为是目标传感器(仅用于自动连接的快速命中)。 */
     fun isTargetSensor(name: String): Boolean =
         name.contains("S314", ignoreCase = true) || name.contains("Magene", ignoreCase = true)
+
+    /**
+     * 名称兜底识别心率带。
+     *
+     * 标准心率带绝大多数会在广播包中携带 0x180D,所以主判据是 [DiscoveredDevice.hasHrs];
+     * 但少数廉价/老型号(以及部分手机的广播缓存)不带服务 UUID,这里再按**明确指向心率**的
+     * 关键词兜底。
+     *
+     * 注意:这里刻意**不包含** magene / garmin / wahoo / bryton 等"既做心率带也做码表"的品牌名 ——
+     * 否则迈金 S314 速度踏频传感器会被同时判定成心率带,造成错误配对。
+     */
+    fun isHeartRateDevice(name: String): Boolean {
+        val n = name.lowercase()
+        return HEART_RATE_NAME_HINTS.any { n.contains(it) }
+    }
+
+    private companion object {
+        val HEART_RATE_NAME_HINTS = listOf(
+            "heart", "hrm", "hr-", "hr_", "polar", "tickr", "h10", "h9", "coospo", "心率",
+        )
+    }
 }

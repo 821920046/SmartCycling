@@ -1,10 +1,14 @@
 # 对抗审查报告(Adversarial Review)
 
-> 审查对象:SmartCycling 本轮"双主题 UI 重构 + 双引擎离线地图"改动
+> 审查对象:SmartCycling 历轮改动(双主题 UI + 双引擎离线地图 + 训练统计/导航增强
+> + GPX 生态 / 心率带 / 个人纪录)。
 > 审查姿态:**假定实现是错的**,用"挑毛病"的视角逐层证伪;凡不能证伪的,才允许保留。
-> 审查方法:源码级静态审查 + 与 osmdroid 6.1.20 官方源码逐接口比对(而非凭记忆)。
+> 审查方法:源码级静态审查 + 与 osmdroid 6.1.20 官方源码逐接口比对(而非凭记忆)
+> + 全工程符号表比对 + 关键算法独立建模验证。
+> 累计发现并修复缺陷 **D1 ~ D15**(见 §一、§五)。
 > 说明:本机无 JDK / Android SDK / gradle-wrapper.jar,**无法本地编译**,
 > 因此所有结论均来自源码比对与静态检查,并已在文末"验证局限"中显式声明。
+> ⚠️ 尤其注意 **D10**:它证明了"静态检查全绿"并不等于"能编译",务必在本地/CI 真跑一次构建。
 
 ---
 
@@ -166,7 +170,7 @@ osmdroid 是**纯栅格**管线;`.pbf/.mvt` 为 protobuf 矢量切片,必须经�
 | R5 | osmdroid 清单会合并进 `WRITE_EXTERNAL_STORAGE`(maxSdkVersion=28) | 在 Android 10+ 被忽略;如需洁癖可 `tools:node="remove"`。 |
 | R6 | `OfflineMapInspector` 对超大 ZIP 需遍历中央目录 | 仅读中央目录(不读数据体),数 GB 包仍可秒级完成;仅当条目数极多时有可感耗时。 |
 | R9 | `collectSensor()` 在暂停期间直接丢弃读数 | 恢复骑行后速度可能有一瞬为 0(等待下一帧)。可接受。 |
-| R10 | 地图页 → 骑行页切换时,两路 FusedLocation 有 ≤5s 重叠 | `MapViewModel.currentLatLng` 用 `WhileSubscribed(5s)`,离开地图页后 5s 才停止;而 `RideViewModel` 立刻开始订阅。重叠窗口内 `container.locationTracker` 被调用两次 `track()` → 两次 `requestLocationUpdates`。影响:约 5 秒的双注册,自动收敛。若要彻底消除,可把 `track()` 收敛为 `shareIn` 的单例上游。 |
+| R10 | 地图页 → 骑行页切换时,两路定位(现为高德 AMapLocation)有 ≤5s 重叠 | `MapViewModel.currentLatLng` 用 `WhileSubscribed(5s)`,离开地图页后 5s 才停止;而 `RideViewModel` 立刻开始订阅。重叠窗口内 `container.locationTracker` 被调用两次 `track()` → 两次 `requestLocationUpdates`。影响:约 5 秒的双注册,自动收敛。若要彻底消除,可把 `track()` 收敛为 `shareIn` 的单例上游。 |
 | R11 | 离线底图上"我的位置"点与"目的地"图钉颜色硬编码 | 分别为 `#1B6EF3` / `#E5484D`,不随主题变化。二者在明暗两套色板下对比度均可接受,故暂不参数化。 |
 | R12 | `RideViewModel.collectLocation` 在可信性判断**之前**累加 `deltaMeters` | 经核验为**无害**:不可信点的 `deltaMeters` 恒为 0(跳点直接置 0;低精度点在 `LocationTracker` 中根本不进入距离计算分支),累加 0 不改变里程。 |
 | R13 | `canDecode()` 对超过 8MB 的首张瓦片直接判"不可解码" | 单张栅格瓦片极少超过 8MB,阈值足够宽松;极端情况只会产生一条无害的琥珀色提醒,不阻断导入。 |
@@ -177,7 +181,7 @@ osmdroid 是**纯栅格**管线;`.pbf/.mvt` 为 protobuf 矢量切片,必须经�
 
 **已做**
 1. 与 osmdroid 6.1.20 官方源码**逐接口比对**:`IArchiveFile`、`MapTileProviderArray`、`MapTileFileArchiveProvider`、`MapTileApproximater`、`ZipFileArchive`、`DatabaseFileArchive`、`MBTilesFileArchive`、`MapView`、`MapTileIndex`、`MapTileProviderBase`、`OfflineTileProvider`。
-2. 全量 **55** 个 `.kt` 文件**结构静态检查**:括号/圆括号/方括号配平、`package` 声明与 `import` 位置合法性 —— 全部通过。
+2. 全量 **66** 个 `.kt` 文件**结构静态检查**:用状态机剥离注释/字符串/字符字面量后统计括号配平(早期版本的正则剥离会被 `'"'` 这类字符字面量骗过,已修正为逐字符状态机)—— 全部通过。
 3. 交叉引用检查:确认无 `_activeId/_mapSource/...` 等已删除字段的残留引用;确认 `VECTOR_FORMATS / TILE_EXTENSIONS` 定义与使用一致;确认 `LocationSample` 全工程仅 1 处构造点且已同步新增字段;确认 `ImportResult.Success` / `ImportUiState` 的全部构造点均使用具名参数(故新增带默认值的字段不会破坏调用)。
 4. **第二轮全量通读**:补齐首轮未审的文件(全部界面、`RideViewModel`、`LocationTracker`、`AppPalette`、`Type`、`MainActivity`、`Theme`、`AndroidManifest`、`build.gradle.kts`),逐项核对"界面引用的色板字段 / 组件参数 / 数据类字段"是否都已定义 —— 由此发现并修复 D6、D7。
 5. **第三轮(本轮)对抗审查**:把本轮新增的 P1/P2 改动本身当作审查对象,重点回查"为修复 A 是否引入了缺陷 B"。由此发现并修复 **D8**(双路定位)、**D9**(成功路径的提醒被吞)。同时确认 R1/R2/R3/R4/R7/R8 已闭环,并复核 D1 的单例前提 —— `Container.settings` 为 `by lazy` 进程级单例、`SmartCyclingApp.container` 全局唯一,故"共享流"方案成立。
@@ -188,3 +192,131 @@ osmdroid 是**纯栅格**管线;`.pbf/.mvt` 为 protobuf 矢量切片,必须经�
 3. 未覆盖 Compose 运行时行为(重组、生命周期回调时序)与 osmdroid 线程池的实机表现。
 
 > 复核建议:在具备 Android SDK 的环境执行 `./gradlew :app:assembleDebug`,并优先用一张**高德(GCJ-02)MBTiles**与一张**OSM(WGS-84)文件夹瓦片**各导入一次,重点验证"激活即生效"(D1)、"车标与底图对齐"(2.5),以及"在线模式下 FusedLocation 是否随地图页离开而停止"(D8,可用 Profiler 观察定位回调)。
+
+---
+
+## 五、第四轮对抗审查:GPX 生态 + 心率带 + 个人纪录
+
+本轮目标是"结合同类开源项目的长处把工程补完整"。对照项目:
+**OpenTracks**(GPX 导出 / 隐私优先)、**Trackbook**(离线优先记录)、
+**OSMBonusPack**(GPX/KML 解析)、**Gadgetbridge / pizero_bikecomputer**(BLE 心率带)、
+**Strava / Komoot**(个人纪录、轨迹分享)。审查对象是**本轮新增的全部代码**,
+重点仍是"新代码是否引入新缺陷"以及"跨模块契约是否自洽"。
+
+### D10 —(编译阻断,致命)`DataCell` 被引用但全工程无定义
+
+**现象**:`ui/components/DataGrid.kt` 底部两栏指标调用了 `DataCell(Modifier.weight(1f), …)`,
+但**全仓找不到该函数的定义**。Kotlin 没有隐式声明,这是**硬编译错误** ——
+也就是说当前 `main` 分支的 `app` 模块**根本无法编译**。
+
+**成因**:两条开发线合并时,`DataGrid.kt` 取了其中一条线的版本(含 `DataCell` 调用),
+而 `DataCell` 的定义随另一条线的版本被丢弃,合并时没有察觉。
+
+**为什么前几轮没发现**:前几轮静态检查只做"括号配平 + 已删除字段残留引用",
+**没有做"被调用的符号是否存在"的全局校验**。这类"单侧丢失"正是合并冲突的典型产物。
+
+**修复**:补回 `DataCell` 实现(两栏:大数值 + 小标签,水平居中),并把检查手段升级为
+**全工程符号表比对**(见 §5.4),这类缺陷以后会被自动拦下。
+
+### D11 —(数据正确性)GPX 导出的坐标系必须纠到 WGS-84
+
+**现象(若不做处理)**:应用内部所有来自高德的坐标(定位、路线、轨迹点)都是 **GCJ-02**。
+把库里的经纬度**原样**写进 GPX,文件本身完全合法,但在 Strava / Komoot / Google Earth /
+Garmin BaseCamp 打开会**整体偏移 300~600 米**。
+
+**为什么危险**:这是典型的"看起来对"的缺陷 —— 在自己的 App 里回放轨迹完全正常,
+只有导入第三方软件才暴露,用户会误以为是对方软件的问题。
+
+**修复**:`export/RideGpx.fromRide()` 写 GPX 前统一做一次
+`GeoTransform.convert(lat, lon, GCJ02, WGS84)`;反向的 `MapViewModel.importRoute()`
+做 `WGS84 → GCJ02`,保证"导出 → 导入"闭环一致。
+
+> 这与 §2.5 的"离线瓦片层纠偏"是同一第一性原理的两处应用:
+> **凡跨越坐标系边界,必须在边界处显式换算,绝不允许"碰巧数字接近"而蒙混过关。**
+
+### D12 —(Room 迁移校验)新增列必须 `NOT NULL DEFAULT 0`,且实体要同步声明默认值
+
+SQLite 无法 `ADD COLUMN` 一个"NOT NULL 且无默认值"的列,因此 v3→v4 新增的三列
+(`avgHeartRateBpm` / `maxHeartRateBpm` / `elevationM`)必须带 `DEFAULT 0`。
+而 Room 在迁移执行完后会**校验实际 schema 与实体声明是否一致**;
+若实体上不同步标注 `@ColumnInfo(defaultValue = "0")`,校验会判定"迁移未正确执行"并抛异常。
+
+**已处置**:三个新列同时具备"迁移里的 `DEFAULT 0`"与"实体上的 `@ColumnInfo(defaultValue = "0")"`。
+
+**顺带发现的既有隐患(评估后不改)**:v1→v2 加的 `calories` / `elevationGainM`
+迁移里带了 `DEFAULT 0`,但实体上**没有**声明 `defaultValue`。理论上会让
+"从 v1 一路升上来"的设备在校验时不一致。之所以不动它:
+
+- 若给实体补上 `defaultValue = "0"`,则**全新安装 v3** 的设备(其 `rides` 表在
+  `CREATE TABLE` 时并没有 `DEFAULT` 子句,实际默认值为 NULL)会**反而**校验失败 ——
+  等于用一个新缺陷换掉一个旧隐患;
+- 该隐患只影响"v1 → v2 → v3 → v4"这条多级升级路径,而本应用尚处早期(versionCode 曾为 2),
+  实际存在此类设备库的概率极低。
+
+**结论**:保持原样,并在 `Entities.kt` 就地留注释说明,避免后来者"好心改坏"。
+
+### D13 —(安全)GPX 是不可信输入,解析前必须关闭 DTD / 外部实体
+
+GPX 是用户从外部(论坛、群文件、他人分享)拿到的文件,属于**不可信输入**。
+XML 外部实体注入(XXE)可让恶意 GPX 读取设备本地文件并把内容带出去。
+
+**修复**:`GpxFormat.parse()` 构造 `DocumentBuilderFactory` 时设
+`isExpandEntityReferences = false`、`isXIncludeAware = false`,并关闭
+`disallow-doctype-decl` / `external-general-entities` / `external-parameter-entities`。
+所有 `setFeature` 均用 `runCatching` 包裹 —— 个别实现不支持这些 feature 会抛
+`ParserConfigurationException`,不能因此让正常文件也解析失败。
+
+### D14 —(功能性)心率带的"名称兜底识别"不能纳入歧义品牌名
+
+初版把 `magene / garmin / wahoo / bryton / igpsport` 等品牌名都放进心率带关键词表。
+问题是这些品牌**既做心率带也做码表/速度踏频传感器** —— 迈金 S314 正是 Magene 的产品。
+结果:配对页会把 S314 同时判定为"心率带",用 `HeartRateManager` 去连它,而它并不提供 0x180D,
+连接必然失败并干扰正常的 CSC 配对。
+
+**修复**:关键词表只保留**明确指向心率**的词(`heart` / `hrm` / `hr-` / `hr_` / `polar` /
+`tickr` / `h10` / `h9` / `coospo` / `心率`);**主判据始终是广播包里的 0x180D 服务 UUID**
+(标准心率带几乎都会携带)。品牌名一律不进表。
+
+### D15 —(架构)心率带与 CSC 必须是两条独立连接
+
+若共用一个 `BleManager`,心率带掉线会连带把速度/踏频连接一起拖垮,反之亦然。
+**处置**:`HeartRateManager` 与 `S314Manager` 各自独立(同构实现,各自独立的重连策略),
+由 `Container` 分别持有。配对页中只有 CSC 的连接状态决定是否放行进入主界面;
+心率带**后台静默连接**,连上与否都不阻塞主流程。
+
+同时给心率读数加了**陈旧检测**(`HR_STALE_MS = 5000`,比 CSC 的 3000 宽松,因心率带
+上报间隔本就较长),掉线后实时心率自动归零,不会"卡在最后一个读数";
+`hasHeartRate` 作为 UI 门控 —— 没有心率带时,骑行页 / 成绩页 / 历史卡片**完全不出现**心率行。
+
+### 5.4 本轮验证手段(相比前几轮升级)
+
+1. **全工程符号表比对**(新增,专为抓 D10 这类缺陷):抽取所有 `.kt` 的声明名
+   (fun/class/object/val/var/枚举项/构造参数)+ 各文件 `import` + 项目内声明集合,
+   再扫描所有 `Identifier(` 调用点;凡"未导入、本文件未声明、全工程未声明、不在白名单"
+   者一律报出。结果:仅剩 18 处**已知误报**(`synchronized`/`buildString`/`doubleArrayOf`
+   等 stdlib,以及 `setNotificationCallback`/`drawArc` 等继承或他对象成员),**无真实缺失符号**;
+   `DataCell` 在修复后已从报告中消失。
+2. **括号配平改为逐字符状态机**:旧的正则剥离会被 `.append('"')` 这类
+   **字符字面量内含双引号**的写法骗过,产生 4 个假警报;改状态机后 66 个文件全部配平。
+3. **GPX 格式语义独立建模验证**:在无 JDK / 无 Kotlin 编译器的前提下,用 Python
+   **独立复现** `GpxFormat.write()` 的字符串生成逻辑,再用标准 XML 解析器回读,验证:
+   命名空间 / schemaLocation 合法、`lat/lon/ele/time` 往返一致、XML 特殊字符正确转义、
+   多轨迹文档合法、`rtept` 可解析、带 `+08:00` 偏移的时间能正确解析、空白输入被拒绝。
+   **全部通过**。这验证了"格式设计"本身无误(但不等于 Kotlin 代码已编译通过)。
+4. **图标名合法性核对**:新增的 `FileOpen` / `FileDownload` / `EmojiEvents` / `Favorite`
+   逐一对照 Material Icons 官方码点表(`MaterialIcons-Regular.codepoints`,2235 个图标),
+   确认全部存在 —— 图标名写错同样是硬编译错误。
+5. **主题 token 核对**:确认新代码引用的 `palette.danger/hudValue/hudLabel/primaryContainer`
+   与 `Space.xs/sm/md/lg`、`Radius.md/lg`、`MaterialTheme.typography.*` 均已定义。
+
+### 5.5 本轮仍未做(受环境限制)
+
+- **依旧未编译、未运行**。本机无 JDK 17 / Android SDK / gradle-wrapper.jar。
+  D10 的教训说明"静态检查通过"≠"能编译":**必须在本地或 CI 真跑一次**
+  `./gradlew :app:assembleDebug`,并跑通 `./gradlew :app:testDebugUnitTest`
+  以执行 `GpxFormatTest`(7 例)与 `HrParserTest`(5 例)。
+- 未在真机验证:GPX 导入 Strava 后的对齐效果、SAF 写入、FileProvider 分享、
+  心率带实际连接与回连、Room v3→v4 迁移。
+- 云同步(`CloudSyncRepository`)载荷**未包含**新增的心率/海拔字段,
+  即云端目前仍只存 lat/lon/speed/时间戳。如需同步,要一并修改 `cloudflare/` 的
+  worker 与表结构 —— 本轮未做,以免在未知表结构下擅自改动。

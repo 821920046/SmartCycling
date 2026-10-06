@@ -25,6 +25,9 @@ import com.honglian.smartcycling.SmartCyclingApp
 import com.honglian.smartcycling.ble.ConnectionState
 import com.honglian.smartcycling.core.MapSource
 import com.honglian.smartcycling.core.SettingsViewModel
+import com.honglian.smartcycling.export.GpxFormat
+import com.honglian.smartcycling.export.RideExporter
+import com.honglian.smartcycling.export.RideGpx
 import com.honglian.smartcycling.map.MapViewModel
 import com.honglian.smartcycling.offline.OfflineMapsViewModel
 import com.honglian.smartcycling.pairing.PairingViewModel
@@ -67,6 +70,7 @@ fun AppNav(
     val offlineViewModel: OfflineMapsViewModel = viewModel()
 
     val connection by pairingViewModel.connection.collectAsState()
+    val hrConnection by pairingViewModel.hrConnection.collectAsState()
     val devices by pairingViewModel.devices.collectAsState()
     val routePoints by mapViewModel.route.collectAsState()
     val destination by mapViewModel.destination.collectAsState()
@@ -116,6 +120,13 @@ fun AppNav(
                 devices = devices,
                 onConnect = { pairingViewModel.connect(it) },
                 onStartScan = { pairingViewModel.startScan() },
+                hrConnection = hrConnection,
+                onSkip = {
+                    onPaired()
+                    navController.navigate(Routes.MAP) {
+                        popUpTo(Routes.PAIRING) { inclusive = true }
+                    }
+                },
             )
             androidx.compose.runtime.LaunchedEffect(connection) {
                 if (connection == ConnectionState.READY) {
@@ -166,6 +177,7 @@ fun AppNav(
                 currentLocation = currentLocation,
                 onSwitchSource = { settingsViewModel.updateMapSource(it) },
                 onSelectMapType = { settingsViewModel.updateMapType(it) },
+                onImportRoute = { uri -> mapViewModel.importRoute(uri) },
             )
         }
 
@@ -207,8 +219,22 @@ fun AppNav(
         }
         composable(Routes.SUMMARY) {
             val summary by rideViewModel.lastSummary.collectAsState()
+            val lastSavedId by rideViewModel.lastSavedRideId.collectAsState()
             RideSummaryScreen(
                 state = summary,
+                // 刚骑完的场景下,"立刻分享到 Strava / Komoot / 微信"比"存成文件"更自然,
+                // 因此这里走系统分享面板(其中也包含"保存到文件")。
+                onExportGpx = {
+                    val id = lastSavedId
+                    if (id != null) {
+                        coroutineScope.launch {
+                            val ride = container.rideRepository.ride(id) ?: return@launch
+                            val points = container.rideRepository.trackPoints(id)
+                            val gpx = GpxFormat.write(RideGpx.fromRide(ride, points))
+                            RideExporter.shareGpx(context, RideExporter.fileName(ride.startedAt), gpx)
+                        }
+                    }
+                },
                 onDone = {
                     mapViewModel.reset()
                     navController.navigate(Routes.MAP) {
@@ -244,6 +270,21 @@ fun AppNav(
                 mapType = mapType,
                 mapSource = effectiveSource,
                 offlineSpec = activeOfflineSpec,
+                onExportRide = { ride, uri ->
+                    coroutineScope.launch {
+                        val points = container.rideRepository.trackPoints(ride.id)
+                        val gpx = GpxFormat.write(RideGpx.fromRide(ride, points))
+                        RideExporter.writeToUri(context, uri, gpx)
+                    }
+                },
+                onExportAll = { uri ->
+                    coroutineScope.launch {
+                        val tracks = RideGpx.fromRides(rides) { id ->
+                            container.rideRepository.trackPoints(id)
+                        }
+                        RideExporter.writeToUri(context, uri, GpxFormat.write(tracks))
+                    }
+                },
             )
         }
     }

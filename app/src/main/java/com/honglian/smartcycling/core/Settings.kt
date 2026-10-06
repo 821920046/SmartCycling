@@ -150,6 +150,16 @@ class Settings(context: Context) {
         get() = prefs.getBoolean(KEY_LOCAL_ONLY, false)
         set(value) { prefs.edit().putBoolean(KEY_LOCAL_ONLY, value).apply() }
 
+    /** 已记住的心率带 MAC 地址;非空时扫描到该设备会自动回连。 */
+    var hrDeviceAddress: String
+        get() = prefs.getString(KEY_HR_ADDR, "") ?: ""
+        set(value) { prefs.edit().putString(KEY_HR_ADDR, value).apply() }
+
+    /** 已记住的心率带名称(仅用于界面展示)。 */
+    var hrDeviceName: String
+        get() = prefs.getString(KEY_HR_NAME, "") ?: ""
+        set(value) { prefs.edit().putString(KEY_HR_NAME, value).apply() }
+
     companion object {
         private const val KEY_WHEEL = "wheel_preset"
         private const val KEY_DEVICE_ID = "device_id"
@@ -166,6 +176,8 @@ class Settings(context: Context) {
         private const val KEY_HIGH_CONTRAST = "high_contrast"
         private const val KEY_ONBOARDING = "onboarding_shown"
         private const val KEY_LOCAL_ONLY = "local_only_mode"
+        private const val KEY_HR_ADDR = "hr_device_address"
+        private const val KEY_HR_NAME = "hr_device_name"
     }
 }
 
