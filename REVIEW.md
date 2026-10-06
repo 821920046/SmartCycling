@@ -450,6 +450,32 @@ XML 外部实体注入(XXE)可让恶意 GPX 读取设备本地文件并把内容
   随 `strings.xml` 本地化。公制下的播报文本与改造前**逐字一致**("120 米" / "12.3 公里"),
   英制下才切换为"英尺 / 英里"。
 
+### D24 —(范围误判 + 文档夸大)上一轮的"非 UI 文案"分类过粗,漏掉了真实用户可见文案
+
+- **现象**:第五轮(D17)宣称"全部 UI 文案已资源化",并把剩余 74 处字面量归为
+  "非 UI 文案(日志/错误消息/枚举 label)"一笔带过。本轮用**泛化后的扫描器**复核,
+  发现其中相当一部分**确实会显示到界面上**:
+  - `MapViewModel` 的 `status`(`"定位中…"` / `"路线已规划,可以开始骑行"` …)
+    由 `MapScreen` 第 269 行直接渲染到状态条;
+  - `OfflineMapsViewModel` 的 `message`(导入进度 / 结果)由 `OfflineMapsScreen` 第 197 行渲染;
+  - `MapCrs.label` / `WheelPreset.label` 由坐标系、车轮周长选择弹窗渲染;
+  - `OfflineMapInspector` 的失败原因经 `ImportResult.message` 展示。
+- **根因(值得记住)**:上一轮的残留扫描**按目录白名单**判定"是不是 UI"
+  (`ui/`、`nav/`、`MainActivity.kt`)。这个口径天然漏掉两类:
+  ① `offline/OfflineMapView.kt` 这类**放在非 UI 目录下的 Compose 组件**;
+  ② 由 ViewModel 持有、但最终被界面渲染的**字符串状态**。
+- **本轮实际修复的两处**(属于上面的第 ① 类,一行即可,已修):
+  - `offline/OfflineMapView.kt`:`destMarker.title = "目的地"` → `context.getString(R.string.map_marker_destination)`
+    (该资源早已存在却没用上);
+  - `export/RideExporter.kt`:系统分享面板标题 `"分享 GPX 轨迹"` → 新增 `R.string.gpx_share_chooser`。
+- **第 ② 类未修**:它需要把"枚举 / 状态机里的 `String`"改成"`@StringRes` + 格式化参数",
+  再由界面层解析 —— 跨 6 个文件的独立重构。**本轮不做,但已在 `README.md` 中如实列出缺口**
+  (此前的表述"所有用户可见文案已抽取"属于夸大,已改写)。
+- **校验器改进(核心收获)**:判定"是否 UI"**不能按目录**。已把规则改为
+  "路径含 `ui|nav|screens|components` **或**文件名匹配 `*Activity|*Screen|*Dialog|*View|*Sheet|*Page`",
+  并把泛化后的脚本收进技能 `android-kotlin-static-verification`(`scripts/resource_check.py`),
+  以免下次再漏。
+
 ### 7.1 本轮验证手段
 
 1. **全工程残留扫描**:对已删除符号(本轮为 `fmtDistance`)做 `\bname\s*\(` 全量扫描 —— **0 残留**。

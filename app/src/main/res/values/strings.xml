@@ -92,6 +92,7 @@
     <string name="summary_share_chooser">分享骑行成绩</string>
     <string name="summary_share">📤 分享成绩</string>
     <string name="summary_export_gpx">💾 导出 GPX 轨迹</string>
+    <string name="gpx_share_chooser">分享 GPX 轨迹</string>
     <string name="summary_done">完成 · 返回地图</string>
     <string name="summary_share_text">我用智能骑行完成了一次骑行 🚴\n里程 %1$s · 时长 %2$s · 均速 %3$s · 最高 %4$s · 热量 %5$.0f kcal · 爬升 %6$s</string>
 

@@ -14,6 +14,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.amap.api.maps.model.LatLng
+import com.honglian.smartcycling.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.osmdroid.util.BoundingBox
@@ -62,7 +63,7 @@ fun OfflineMapView(
 
         destMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
         destMarker.icon = pinDrawable(AndroidColor.parseColor("#E5484D"))
-        destMarker.title = "目的地"
+        destMarker.title = context.getString(R.string.map_marker_destination)
 
         myMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
         myMarker.icon = dotDrawable(AndroidColor.parseColor("#1B6EF3"), AndroidColor.WHITE)

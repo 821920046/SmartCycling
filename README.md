@@ -213,12 +213,28 @@ Garmin Connect、行者、黑鸟、Komoot、Strava 等导出的文件都能直�
 
 ## 文案与多语言
 
-所有用户可见文案(含 Toast / 语音播报 / 无障碍 `contentDescription`)已从代码中抽取到
-`app/src/main/res/values/strings.xml`,统一通过 `stringResource()` / `context.getString()` 读取。
+**Compose UI 层**的用户可见文案(含 `Text` / `contentDescription` / 对话框 / 分享文案 / 语音播报)
+已全部抽取到 `app/src/main/res/values/strings.xml`,统一通过 `stringResource()` / `context.getString()` 读取。
 
 - 新增 `values-en/strings.xml` 即可接入英文,无需改动任何 Kotlin 代码;
 - 带变量的文案一律使用**位置占位符**(`%1$d` / `%1$.1f` / `%1$s`),保证语序可调整;
 - 版本号取自 `BuildConfig.VERSION_NAME`,不再手写于字符串中(避免"关于"页版本落后于实际构建)。
+
+### 尚未资源化的部分(已知缺口)
+
+非 Compose 层仍有用户可见文案留在代码里。它们**不是"内部日志"**——经核对确实会显示到界面上:
+
+| 位置 | 数量 | 展示位置 | 为何暂未做 |
+|---|---|---|---|
+| `map/MapViewModel.kt` | ~16 | 地图页顶部状态条(`MapScreen` 直接渲染 `status`) | 需把 `status: StateFlow<String>` 改为资源 + 参数,或在 ViewModel 内用 `getString` |
+| `offline/OfflineMapsViewModel.kt` | ~6 | 离线地图页的导入进度 / 结果提示 | 同上 |
+| `offline/OfflineMapInspector.kt` | ~19 | 导入失败原因(经 `ImportResult.message` 展示) | 需改为持有 `@StringRes` + 参数 |
+| `offline/MapCrs.kt` | ~12 | 坐标系选择弹窗(`crs.label` / `desc`) | 枚举 `label: String` → `@StringRes labelRes: Int`,属独立重构 |
+| `core/WheelPreset.kt` | ~10 | 车轮周长选择弹窗(`p.label`) | 同上 |
+| `cloud/CloudSyncRepository.kt`、`core/CrashHandler.kt`、`export/GpxFormat.kt` | 各 1 | 崩溃弹窗 / 异常文本 | 面向开发者,可保持原样 |
+
+要彻底多语言化,需先把"枚举/状态机里的 `String`"改成"`@StringRes` + 格式化参数",
+再由界面层解析 —— 这是一次跨 6 个文件的独立重构,尚未进行。
 
 ## 构建
 
