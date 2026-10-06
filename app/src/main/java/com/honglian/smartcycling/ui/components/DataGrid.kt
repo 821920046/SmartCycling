@@ -1,66 +1,119 @@
 package com.honglian.smartcycling.ui.components
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.VerticalDivider
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Autorenew
+import androidx.compose.material.icons.outlined.Place
+import androidx.compose.material.icons.outlined.Speed
+import androidx.compose.material.icons.outlined.Timer
+import androidx.compose.material.icons.outlined.TrendingUp
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.honglian.smartcycling.ride.RideState
 import com.honglian.smartcycling.ride.SensorMode
-import com.honglian.smartcycling.ui.theme.DataLabel
-import com.honglian.smartcycling.ui.theme.DataValue
-import com.honglian.smartcycling.ui.theme.DividerNavy
+import com.honglian.smartcycling.ui.theme.AppTheme
 import kotlin.math.roundToInt
 
-/** 2x2 数据网格:骑行时长 / 骑行路程 / 平均速度 / 踏频频率。 */
+/**
+ * 骑行数据网格(2×2)。
+ * 每格为"图标 + 数值 + 标签",数值统一使用表格数字保证跳动时不抖动。
+ */
 @Composable
 fun DataGrid(state: RideState, modifier: Modifier = Modifier) {
-    val alpha = if (state.isPaused) 0.6f else 1.0f
-    Column(modifier.fillMaxWidth().alpha(alpha)) {
-        Row(Modifier.fillMaxWidth()) {
-            DataCell(Modifier.weight(1f), "⏱ " + state.durationText, "骑行时长")
-            VerticalDivider(color = DividerNavy)
-            DataCell(Modifier.weight(1f), "🏁 %.2f km".format(state.distanceKm), "骑行路程")
+    val cadenceMode = state.sensorMode == SensorMode.CADENCE
+    val dim = if (state.isPaused) 0.45f else 1f
+
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            MetricTile(
+                modifier = Modifier.weight(1f),
+                icon = Icons.Outlined.Timer,
+                value = state.durationText,
+                label = "骑行时长",
+                alpha = dim,
+            )
+            MetricTile(
+                modifier = Modifier.weight(1f),
+                icon = Icons.Outlined.Place,
+                value = "%.2f km".format(state.distanceKm),
+                label = "骑行路程",
+                alpha = dim,
+            )
         }
-        HorizontalDivider(color = DividerNavy)
-        val cadenceMode = state.sensorMode == SensorMode.CADENCE
-        Row(Modifier.fillMaxWidth()) {
-            DataCell(Modifier.weight(1f), "📈 %.1f km/h".format(state.avgSpeedKmh), "平均速度")
-            VerticalDivider(color = DividerNavy)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            MetricTile(
+                modifier = Modifier.weight(1f),
+                icon = Icons.Outlined.TrendingUp,
+                value = "%.1f km/h".format(state.avgSpeedKmh),
+                label = "平均速度",
+                alpha = dim,
+            )
             if (cadenceMode) {
-                DataCell(Modifier.weight(1f), "🔄 ${state.avgCadenceRpm.roundToInt()} rpm", "平均踏频")
+                MetricTile(
+                    modifier = Modifier.weight(1f),
+                    icon = Icons.Outlined.Autorenew,
+                    value = "${state.avgCadenceRpm.roundToInt()} rpm",
+                    label = "平均踏频",
+                    alpha = dim,
+                )
             } else {
-                DataCell(Modifier.weight(1f), "🔄 0 rpm", "平均踏频")
+                MetricTile(
+                    modifier = Modifier.weight(1f),
+                    icon = Icons.Outlined.Speed,
+                    value = "%.1f km/h".format(state.maxSpeedKmh),
+                    label = "最高速度",
+                    alpha = dim,
+                )
             }
         }
     }
 }
 
 @Composable
-private fun DataCell(modifier: Modifier, value: String, label: String) {
-    Column(modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+private fun MetricTile(
+    icon: ImageVector,
+    value: String,
+    label: String,
+    modifier: Modifier = Modifier,
+    alpha: Float = 1f,
+) {
+    val palette = AppTheme.palette
+    Column(modifier.padding(vertical = 4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = palette.hudLabel.copy(alpha = 0.9f * alpha),
+                modifier = Modifier.size(15.dp),
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = label,
+                fontSize = 12.sp,
+                color = palette.hudLabel.copy(alpha = alpha),
+            )
+        }
+        Spacer(Modifier.height(4.dp))
         Text(
             text = value,
-            fontSize = 19.sp,
-            fontWeight = FontWeight.ExtraBold,
-            color = DataValue,
-            fontFamily = FontFamily.Monospace
-        )
-        Text(
-            text = label,
-            fontSize = 12.sp,
-            color = DataLabel,
-            fontWeight = FontWeight.Medium
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+            color = palette.hudValue.copy(alpha = alpha),
         )
     }
 }
-

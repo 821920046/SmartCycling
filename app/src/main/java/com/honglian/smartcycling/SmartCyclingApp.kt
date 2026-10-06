@@ -10,6 +10,7 @@ import com.amap.api.navi.NaviSetting
 import com.amap.api.services.core.ServiceSettings
 import com.honglian.smartcycling.core.Container
 import com.honglian.smartcycling.core.CrashHandler
+import com.honglian.smartcycling.offline.OfflineMapEngine
 
 /**
  * 应用入口。持有全局依赖容器(轻量 DI),并创建前台服务通知渠道。
@@ -24,6 +25,8 @@ class SmartCyclingApp : Application() {
         // 全局崩溃兜底:捕获未处理异常并落盘,下次启动展示
         Thread.setDefaultUncaughtExceptionHandler(CrashHandler(this))
         initAmapPrivacy()
+        // osmdroid 必须在任何 MapView 创建前完成初始化
+        OfflineMapEngine.init(this)
         container = Container(this)
         createRideChannel()
     }

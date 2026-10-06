@@ -16,6 +16,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -26,7 +27,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.honglian.smartcycling.core.CrashHandler
+import com.honglian.smartcycling.core.SettingsViewModel
 import com.honglian.smartcycling.nav.AppNav
 import com.honglian.smartcycling.ride.RideService
 import com.honglian.smartcycling.ui.theme.SmartCyclingTheme
@@ -42,7 +45,11 @@ class MainActivity : ComponentActivity() {
         val crashLog = CrashHandler.consumeCrashLog(this)
 
         setContent {
-            SmartCyclingTheme {
+            // 主题模式由设置页驱动:Activity 级 ViewModel 实例与 AppNav 内共用同一对象。
+            val settingsViewModel: SettingsViewModel = viewModel()
+            val themeMode by settingsViewModel.themeMode.collectAsState()
+
+            SmartCyclingTheme(themeMode = themeMode) {
                 var crash by remember { mutableStateOf(crashLog) }
                 AppNav(
                     onPaired = {

@@ -12,8 +12,8 @@ android {
         applicationId = "com.honglian.smartcycling"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
         vectorDrawables { useSupportLibrary = true }
 
         // 只保留真机常用架构:去掉模拟器专用的 x86/x86_64,大幅减小高德 native 库体积。
@@ -95,6 +95,8 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.navigation:navigation-compose:2.7.7")
+    // SAF 目录树遍历(导入"瓦片文件夹"型离线地图)
+    implementation("androidx.documentfile:documentfile:1.0.1")
 
     // BLE - Nordic (Kotlin 扩展)
     implementation("no.nordicsemi.android:ble-ktx:2.7.5")
@@ -110,7 +112,17 @@ dependencies {
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 
+    // JVM 单元测试:覆盖坐标换算 / 瓦片数学 / CSC 时间戳翻转等纯逻辑(无需设备)。
+    testImplementation("junit:junit:4.13.2")
+
     // 高德官方一体化合包:单个 AAR 已含 3D 地图 + 定位 + 搜索(地理编码/骑行路径规划)。
     // 必须用带 -location-search 后缀的固定版本坐标(普通 navi-3dmap 不含搜索包、单独 3dmap/location/search 又会 duplicate class)。
     implementation("com.amap.api:navi-3dmap-location-search:10.0.700_3dmap10.0.700_loc6.4.5_sea9.7.2")
+
+    // 开源离线瓦片渲染引擎(双引擎中的"离线引擎")。
+    // 选型第一性原理:用户要导入"各大平台的离线地图",这些包绝大多数是**栅格瓦片包**
+    // (SAS.Planet / Mobile Atlas Creator / QGIS 导出),主流格式 MBTiles(SQLite)/{z}/{x}/{y} 文件夹/ZIP。
+    // osmdroid 原生驱动 MBTiles/ZIP/osmdroid-sqlite,并开放 IArchiveFile 接口 → 可自实现文件夹与坐标系适配,
+    // 是格式兼容面最广、体量最小的选择(Apache-2.0,无传染性许可)。
+    implementation("org.osmdroid:osmdroid-android:6.1.20")
 }

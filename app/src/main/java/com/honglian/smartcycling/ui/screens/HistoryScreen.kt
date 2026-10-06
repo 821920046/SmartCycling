@@ -1,38 +1,72 @@
 package com.honglian.smartcycling.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.DirectionsBike
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.DirectionsBike
+import androidx.compose.material.icons.outlined.Place
+import androidx.compose.material.icons.outlined.Timer
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.DialogProperties
 import com.amap.api.maps.model.LatLng
+import com.honglian.smartcycling.core.MapSource
 import com.honglian.smartcycling.data.RideEntity
 import com.honglian.smartcycling.data.TrackPointEntity
+import com.honglian.smartcycling.offline.OfflineLayerSpec
+import com.honglian.smartcycling.offline.OfflineMapView
 import com.honglian.smartcycling.ui.components.NavigationMapView
-import com.honglian.smartcycling.ui.theme.*
+import com.honglian.smartcycling.ui.theme.AppTheme
+import com.honglian.smartcycling.ui.theme.Radius
+import com.honglian.smartcycling.ui.theme.Space
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/** 极致科幻霓虹骑行历史统计与回顾页面。 */
+/** 骑行历史:累计看板 + 记录列表 + 轨迹回放。 */
 @Composable
 fun HistoryScreen(
     rides: List<RideEntity>,
@@ -40,261 +74,270 @@ fun HistoryScreen(
     onGetTrackPoints: suspend (Long) -> List<TrackPointEntity>,
     onBack: () -> Unit,
     mapType: Int = 3,
-    modifier: Modifier = Modifier
+    mapSource: MapSource = MapSource.ONLINE,
+    offlineSpec: OfflineLayerSpec? = null,
+    modifier: Modifier = Modifier,
 ) {
-    val coroutineScope = rememberCoroutineScope()
+    val palette = AppTheme.palette
+    val scope = rememberCoroutineScope()
     val fmt = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()) }
-    
-    // 轨迹弹窗状态
-    var activeRideForTrack by remember { mutableStateOf<RideEntity?>(null) }
-    var trackPoints by remember { mutableStateOf<List<LatLng>>(emptyList()) }
-    var loadingTrack by remember { mutableStateOf(false) }
 
-    // 统计大看板数值
+    var activeRide by remember { mutableStateOf<RideEntity?>(null) }
+    var trackPoints by remember { mutableStateOf<List<LatLng>>(emptyList()) }
+    var loading by remember { mutableStateOf(false) }
+
     val totalDistance = remember(rides) { rides.sumOf { it.distanceKm } }
-    val totalRides = remember(rides) { rides.size }
-    val totalDurationSec = remember(rides) { rides.sumOf { it.durationSec } }
+    val totalDuration = remember(rides) { rides.sumOf { it.durationSec } }
 
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(PanelBgTop, PanelBgBottom)))
+            .background(palette.background)
             .navigationBarsPadding()
+            .statusBarsPadding(),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp)
-        ) {
-            Spacer(Modifier.height(16.dp))
-            
-            // 顶栏面板
+        Column(Modifier.fillMaxSize()) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Space.md, vertical = Space.sm),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.Outlined.ArrowBack, contentDescription = "返回", tint = palette.textPrimary)
+                }
                 Text(
-                    "骑行历史回顾", 
-                    fontSize = 22.sp, 
-                    fontWeight = FontWeight.ExtraBold, 
-                    color = SpeedText
+                    "骑行历史",
+                    style = MaterialTheme.typography.title,
+                    color = palette.textPrimary,
+                    modifier = Modifier.weight(1f),
                 )
-                TextButton(onClick = onBack) {
-                    Text("返回", color = BrandCyan, fontWeight = FontWeight.Bold)
-                }
             }
 
-            Spacer(Modifier.height(8.dp))
-
-            // 1. 霓虹统计大看板
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, GlassBorder, RoundedCornerShape(14.dp)),
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = GlassBg)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
+            Column(Modifier.padding(horizontal = Space.lg)) {
+                Surface(
+                    shape = RoundedCornerShape(Radius.lg),
+                    color = palette.surface,
+                    border = BorderStroke(1.dp, palette.outline),
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
-                    StatBox(value = "%.1f".format(totalDistance), unit = "km", label = "累计里程")
-                    StatBox(value = "$totalRides", unit = "次", label = "骑行次数")
-                    StatBox(value = formatDurationHours(totalDurationSec), unit = "小时", label = "累计时长")
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = Space.lg),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                    ) {
+                        Stat("累计里程", "%.1f".format(totalDistance), "km")
+                        Stat("骑行次数", "${rides.size}", "次")
+                        Stat("累计时长", "%.1f".format(totalDuration / 3600.0), "h")
+                    }
                 }
+                Spacer(Modifier.height(Space.md))
             }
 
-            Spacer(Modifier.height(12.dp))
-
-            // 2. 骑行列表
             LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                Modifier
+                    .weight(1f)
+                    .padding(horizontal = Space.lg),
+                verticalArrangement = Arrangement.spacedBy(Space.sm),
             ) {
                 if (rides.isEmpty()) {
                     item {
                         Box(
-                            modifier = Modifier
+                            Modifier
                                 .fillMaxWidth()
-                                .padding(48.dp),
-                            contentAlignment = Alignment.Center
+                                .padding(Space.xxl),
+                            contentAlignment = Alignment.Center,
                         ) {
-                            Text("暂无本地骑行记录，快去骑行吧！", color = DataLabel, fontSize = 14.sp)
+                            Text(
+                                "暂无骑行记录,完成一次骑行后会显示在这里。",
+                                style = MaterialTheme.typography.body,
+                                color = palette.textTertiary,
+                            )
                         }
                     }
                 }
                 items(rides, key = { it.id }) { ride ->
-                    HistoryCard(
+                    RideCard(
                         ride = ride,
-                        dateFormat = fmt,
+                        dateText = fmt.format(Date(ride.startedAt)),
                         onClick = {
-                            coroutineScope.launch {
-                                loadingTrack = true
-                                activeRideForTrack = ride
-                                val points = onGetTrackPoints(ride.id)
-                                trackPoints = points.map { LatLng(it.latitude, it.longitude) }
-                                loadingTrack = false
+                            scope.launch {
+                                loading = true
+                                activeRide = ride
+                                trackPoints = onGetTrackPoints(ride.id)
+                                    .map { LatLng(it.latitude, it.longitude) }
+                                loading = false
                             }
                         },
-                        onDelete = { onDelete(ride.id) }
+                        onDelete = { onDelete(ride.id) },
                     )
                 }
+                item { Spacer(Modifier.height(Space.lg)) }
             }
         }
     }
 
-    // 轨迹回顾地图大弹窗
-    activeRideForTrack?.let { ride ->
+    activeRide?.let { ride ->
         AlertDialog(
-            onDismissRequest = { activeRideForTrack = null },
-            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+            onDismissRequest = { activeRide = null },
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+            containerColor = palette.surface,
             confirmButton = {},
             dismissButton = {},
-            containerColor = CardBg,
             modifier = Modifier
                 .fillMaxWidth(0.92f)
-                .fillMaxHeight(0.85f)
-                .border(1.dp, GlassBorder, RoundedCornerShape(18.dp)),
+                .fillMaxHeight(0.86f),
             title = {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(fmt.format(Date(ride.startedAt)), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = SpeedText)
-                        Text("里程: %.2f km".format(ride.distanceKm), fontSize = 12.sp, color = DataLabel)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            fmt.format(Date(ride.startedAt)),
+                            style = MaterialTheme.typography.subtitle,
+                            color = palette.textPrimary,
+                        )
+                        Text(
+                            "%.2f km · %s · 均速 %.1f km/h".format(
+                                ride.distanceKm,
+                                formatDuration(ride.durationSec),
+                                ride.avgSpeedKmh,
+                            ),
+                            style = MaterialTheme.typography.caption,
+                            color = palette.textTertiary,
+                        )
                     }
-                    IconButton(onClick = { activeRideForTrack = null }) {
-                        Icon(Icons.Default.Close, contentDescription = "关闭", tint = StopRed)
+                    IconButton(onClick = { activeRide = null }) {
+                        Icon(Icons.Outlined.Close, contentDescription = "关闭", tint = palette.textSecondary)
                     }
                 }
             },
             text = {
                 Box(
-                    modifier = Modifier
+                    Modifier
                         .fillMaxSize()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(PanelBg)
+                        .clip(RoundedCornerShape(Radius.md))
+                        .background(palette.surfaceVariant),
                 ) {
-                    if (loadingTrack) {
-                        CircularProgressIndicator(
-                            color = BrandCyan,
-                            modifier = Modifier.align(Alignment.Center)
+                    when {
+                        loading -> CircularProgressIndicator(
+                            color = palette.primary,
+                            modifier = Modifier.align(Alignment.Center),
                         )
-                    } else {
-                        NavigationMapView(
+                        mapSource == MapSource.OFFLINE && offlineSpec != null -> OfflineMapView(
+                            spec = offlineSpec,
+                            routePoints = trackPoints,
+                            destination = trackPoints.lastOrNull(),
+                            follow = false,
+                            routeColor = palette.primary.toArgb(),
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                        else -> NavigationMapView(
                             modifier = Modifier.fillMaxSize(),
                             routePoints = trackPoints,
                             destination = trackPoints.lastOrNull(),
                             follow = false,
                             showMyLocation = false,
-                            mapType = mapType
+                            mapType = mapType,
+                        )
+                    }
+                    if (!loading && trackPoints.isEmpty()) {
+                        Text(
+                            "该次骑行没有采集到有效轨迹点",
+                            style = MaterialTheme.typography.body,
+                            color = palette.textTertiary,
+                            modifier = Modifier.align(Alignment.Center),
                         )
                     }
                 }
-            }
+            },
         )
     }
 }
 
 @Composable
-private fun StatBox(value: String, unit: String, label: String) {
+private fun Stat(label: String, value: String, unit: String) {
+    val palette = AppTheme.palette
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Row(verticalAlignment = Alignment.Bottom) {
-            Text(
-                value, 
-                fontSize = 24.sp, 
-                fontWeight = FontWeight.Black, 
-                color = BrandCyan, 
-                fontFamily = FontFamily.Monospace
-            )
+            Text(value, style = MaterialTheme.typography.display, color = palette.textPrimary)
             Spacer(Modifier.width(2.dp))
-            Text(unit, fontSize = 11.sp, color = DataLabel, fontWeight = FontWeight.Bold)
+            Text(unit, style = MaterialTheme.typography.caption, color = palette.textTertiary)
         }
-        Spacer(Modifier.height(4.dp))
-        Text(label, fontSize = 11.sp, color = DataLabel)
+        Text(label, style = MaterialTheme.typography.caption, color = palette.textSecondary)
     }
 }
 
 @Composable
-private fun HistoryCard(
+private fun RideCard(
     ride: RideEntity,
-    dateFormat: SimpleDateFormat,
+    dateText: String,
     onClick: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
 ) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.dp, GlassBorder.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = GlassBg)
+    val palette = AppTheme.palette
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(Radius.lg),
+        color = palette.surface,
+        border = BorderStroke(1.dp, palette.outline),
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
-            modifier = Modifier
+            Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .padding(Space.md),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(38.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(BrandCyan.copy(alpha = 0.12f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.Default.DirectionsBike, 
-                        contentDescription = null, 
-                        tint = BrandCyan,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-                Spacer(Modifier.width(12.dp))
-                Column {
-                    Text(
-                        dateFormat.format(Date(ride.startedAt)), 
-                        fontSize = 12.sp, 
-                        color = DataLabel,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "%.2f km · %s · 均速 %.1f".format(
-                            ride.distanceKm,
-                            formatDuration(ride.durationSec),
-                            ride.avgSpeedKmh,
-                        ),
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = SpeedText
-                    )
-                }
-            }
-            
-            // 删除小图标
-            IconButton(
-                onClick = onDelete,
-                colors = IconButtonDefaults.iconButtonColors(contentColor = StopRed.copy(alpha = 0.8f))
+            Box(
+                Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(Radius.md))
+                    .background(palette.primaryContainer),
+                contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Default.Delete, contentDescription = "删除", modifier = Modifier.size(20.dp))
+                Icon(
+                    Icons.Outlined.DirectionsBike,
+                    contentDescription = null,
+                    tint = palette.primary,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+            Spacer(Modifier.width(Space.md))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "%.2f km".format(ride.distanceKm),
+                    style = MaterialTheme.typography.subtitle,
+                    color = palette.textPrimary,
+                )
+                Spacer(Modifier.height(2.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    MiniFact(Icons.Outlined.Timer, formatDuration(ride.durationSec))
+                    Spacer(Modifier.width(Space.md))
+                    MiniFact(Icons.Outlined.Place, "均速 %.1f".format(ride.avgSpeedKmh))
+                }
+                Text(dateText, style = MaterialTheme.typography.caption, color = palette.textTertiary)
+            }
+            IconButton(onClick = onDelete) {
+                Icon(
+                    Icons.Outlined.Delete,
+                    contentDescription = "删除",
+                    tint = palette.textTertiary,
+                    modifier = Modifier.size(19.dp),
+                )
             }
         }
+    }
+}
+
+@Composable
+private fun MiniFact(icon: ImageVector, text: String) {
+    val palette = AppTheme.palette
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, contentDescription = null, tint = palette.textTertiary, modifier = Modifier.size(13.dp))
+        Spacer(Modifier.width(4.dp))
+        Text(text, style = MaterialTheme.typography.caption, color = palette.textSecondary)
     }
 }
 
 private fun formatDuration(sec: Long): String =
     "%02d:%02d:%02d".format(sec / 3600, (sec % 3600) / 60, sec % 60)
-
-private fun formatDurationHours(sec: Long): String =
-    "%.1f".format(sec / 3600.0)
-

@@ -1,5 +1,6 @@
 package com.honglian.smartcycling.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,34 +13,40 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.outlined.Stop
+import androidx.compose.material.icons.outlined.VolumeOff
+import androidx.compose.material.icons.outlined.VolumeUp
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.runtime.*
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.border
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import com.honglian.smartcycling.ui.theme.PauseOrange
-import com.honglian.smartcycling.ui.theme.GlassBorder
-import com.honglian.smartcycling.ui.theme.GlassBg
-import com.honglian.smartcycling.ui.theme.SpeedText
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.zIndex
 import com.amap.api.maps.model.LatLng
+import com.honglian.smartcycling.core.MapSource
+import com.honglian.smartcycling.offline.OfflineLayerSpec
+import com.honglian.smartcycling.offline.OfflineMapView
 import com.honglian.smartcycling.ride.RideState
 import com.honglian.smartcycling.ride.SensorMode
 import com.honglian.smartcycling.ride.SpeedSource
@@ -47,26 +54,23 @@ import com.honglian.smartcycling.ui.components.DataGrid
 import com.honglian.smartcycling.ui.components.NaviMapView
 import com.honglian.smartcycling.ui.components.NavigationMapView
 import com.honglian.smartcycling.ui.components.SpeedRing
-import com.honglian.smartcycling.ui.theme.BrandCyan
-import com.honglian.smartcycling.ui.theme.CardBg
-import com.honglian.smartcycling.ui.theme.DataLabel
-import com.honglian.smartcycling.ui.theme.DividerNavy
-import com.honglian.smartcycling.ui.theme.PanelBg
-import com.honglian.smartcycling.ui.theme.PanelBgBottom
-import com.honglian.smartcycling.ui.theme.PanelBgTop
-import com.honglian.smartcycling.ui.theme.StopRed
+import com.honglian.smartcycling.ui.theme.AppTheme
+import com.honglian.smartcycling.ui.theme.Radius
+import com.honglian.smartcycling.ui.theme.Space
 import kotlin.math.min
 
 /**
- * 骑行中数据界面:左导航 / 右仪表盘(横屏)。
- * - 有目的地时左侧为完整 turn-by-turn 导航(转向箭头+语音,带真实起点);否则为跟随地图。
- * - 左上角提供语音开关(悬浮、置顶、加大点击区域)。
- * - 右侧仪表盘按屏幕高度自适应速度环尺寸,保证整屏可见、无需滚动。
+ * 骑行数据界面(横屏):左侧地图 / 右侧仪表盘。
+ *
+ * 与旧版的关键差异:
+ *  - **不再强制夜间地图**。旧版写死 `mapType = 3`,把用户在设置里选的图层直接吞掉;
+ *    户外骑行时浅色底图反而更清晰。现在严格跟随用户设置。
+ *  - 支持离线引擎:选择离线地图时直接渲染本地瓦片,不再依赖网络。
+ *  - HUD 面板采用"高对比实底 + 表格数字",去掉发光特效,强光下可读性显著提升。
  */
 @Composable
 fun RideScreen(
     state: RideState,
-
     routePoints: List<LatLng> = emptyList(),
     destination: LatLng? = null,
     startPoint: LatLng? = null,
@@ -76,75 +80,114 @@ fun RideScreen(
     onTogglePause: () -> Unit = {},
     onStop: () -> Unit,
     mapType: Int = 3,
+    mapSource: MapSource = MapSource.ONLINE,
+    offlineSpec: OfflineLayerSpec? = null,
     modifier: Modifier = Modifier,
 ) {
+    val palette = AppTheme.palette
     var showStopConfirm by remember { mutableStateOf(false) }
+    val offlineActive = mapSource == MapSource.OFFLINE && offlineSpec != null
 
-    Box(modifier.fillMaxSize().background(Color.Black)) {
-        // 1. 底层：沉浸式全屏地图
-        if (destination != null) {
-            NaviMapView(
-                destination = destination,
-                voiceEnabled = voiceEnabled,
-                routePoints = routePoints,
-                startPoint = startPoint,
-                currentLatLng = currentLatLng,
-                mapType = 3, // 强行夜间模式！赛博朋克必须黑底
-                onExitRequested = { showStopConfirm = true },
-                modifier = Modifier.fillMaxSize(),
-            )
-        } else {
-            NavigationMapView(
-                modifier = Modifier.fillMaxSize(),
-                routePoints = routePoints,
-                follow = true,
-                followLocation = currentLatLng,
-                mapType = 3,
-            )
-        }
-
-        // 2. 左上角：悬浮语音开关
-        if (destination != null) {
-            Surface(
-                onClick = onToggleVoice,
-                shape = RoundedCornerShape(22.dp),
-                color = if (voiceEnabled) BrandCyan else Color(0xAA37424F),
-                contentColor = if (voiceEnabled) Color(0xFF04121A) else Color.White,
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .safeDrawingPadding()
-                    .padding(16.dp)
-                    .zIndex(2f),
-            ) {
-                Text(
-                    if (voiceEnabled) "🔊 语音开" else "🔇 语音关",
-                    fontSize = 14.sp,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+    Row(modifier.fillMaxSize().background(palette.background)) {
+        // ---------------- 左:地图 ----------------
+        Box(Modifier.weight(1f).fillMaxHeight()) {
+            when {
+                offlineActive -> OfflineMapView(
+                    spec = offlineSpec!!,
+                    routePoints = routePoints,
+                    destination = destination,
+                    currentLocation = currentLatLng,
+                    follow = true,
+                    routeColor = palette.primary.toArgb(),
+                    modifier = Modifier.fillMaxSize(),
                 )
+                destination != null -> NaviMapView(
+                    destination = destination,
+                    voiceEnabled = voiceEnabled,
+                    routePoints = routePoints,
+                    startPoint = startPoint,
+                    currentLatLng = currentLatLng,
+                    mapType = mapType,
+                    onExitRequested = { showStopConfirm = true },
+                    modifier = Modifier.fillMaxSize(),
+                )
+                else -> NavigationMapView(
+                    modifier = Modifier.fillMaxSize(),
+                    routePoints = routePoints,
+                    follow = true,
+                    followLocation = currentLatLng,
+                    mapType = mapType,
+                )
+            }
+
+            // 语音开关(仅在线导航具备 TTS)
+            if (destination != null && !offlineActive) {
+                Surface(
+                    onClick = onToggleVoice,
+                    shape = RoundedCornerShape(Radius.pill),
+                    color = palette.floatingSurface,
+                    border = BorderStroke(1.dp, palette.outline),
+                    shadowElevation = 4.dp,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .safeDrawingPadding()
+                        .padding(Space.md),
+                ) {
+                    Row(
+                        Modifier.padding(horizontal = Space.md, vertical = Space.sm),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = if (voiceEnabled) Icons.Outlined.VolumeUp else Icons.Outlined.VolumeOff,
+                            contentDescription = null,
+                            tint = if (voiceEnabled) palette.primary else palette.textTertiary,
+                            modifier = Modifier.size(17.dp),
+                        )
+                        Spacer(Modifier.width(Space.xs))
+                        Text(
+                            text = if (voiceEnabled) "语音播报" else "已静音",
+                            style = MaterialTheme.typography.label,
+                            color = if (voiceEnabled) palette.textPrimary else palette.textTertiary,
+                        )
+                    }
+                }
+            }
+
+            if (offlineActive) {
+                Surface(
+                    shape = RoundedCornerShape(Radius.pill),
+                    color = palette.floatingSurface,
+                    border = BorderStroke(1.dp, palette.outline),
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .safeDrawingPadding()
+                        .padding(Space.md),
+                ) {
+                    Text(
+                        "离线地图 · 无转向语音",
+                        style = MaterialTheme.typography.caption,
+                        color = palette.textSecondary,
+                        modifier = Modifier.padding(horizontal = Space.md, vertical = Space.sm),
+                    )
+                }
             }
         }
 
-        // 3. 右侧：悬浮数据仪表盘 (Glassmorphism HUD)
-        BoxWithConstraints(
-            Modifier
-                .align(Alignment.CenterEnd)
+        // ---------------- 右:仪表盘 ----------------
+        Surface(
+            color = palette.hudBackground,
+            modifier = Modifier
+                .width(308.dp)
                 .fillMaxHeight()
-                .width(320.dp) // 固定合理宽度
-                .padding(vertical = 16.dp, horizontal = 16.dp)
-                .background(Color(0x8804121A), RoundedCornerShape(24.dp))
-                .border(1.dp, BrandCyan.copy(alpha = 0.5f), RoundedCornerShape(24.dp))
-                .safeDrawingPadding()
-                .zIndex(2f),
+                .safeDrawingPadding(),
         ) {
-            val ringDiameter = min(maxWidth.value * 0.82f, 200f).coerceAtLeast(80f)
-            
-            Box(Modifier.fillMaxSize()) {
+            BoxWithConstraints(Modifier.fillMaxSize()) {
+                val ringDiameter = min(maxWidth.value * 0.78f, 196f).coerceAtLeast(96f)
                 Column(
                     Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                        .padding(horizontal = Space.lg, vertical = Space.md),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     val cadenceMode = state.sensorMode == SensorMode.CADENCE
                     SpeedRing(
@@ -152,95 +195,92 @@ fun RideScreen(
                         unit = if (cadenceMode) "rpm" else "km/h",
                         maxValue = if (cadenceMode) 120.0 else 60.0,
                         diameterDp = ringDiameter.toInt(),
+                        accent = palette.primary,
                     )
+                    Spacer(Modifier.height(Space.sm))
                     Text(
-                        when {
-                            state.isPaused -> "⏱ 自动暂停中"
-                            cadenceMode -> "踏频 · 实时 rpm"
+                        text = when {
+                            state.isPaused -> "自动暂停中"
+                            cadenceMode -> "踏频模式"
                             state.speedSource == SpeedSource.SENSOR_WHEEL -> "速度来源 · 传感器"
                             else -> "速度来源 · GPS"
                         },
-                        fontSize = 11.sp,
-                        color = if (state.isPaused) PauseOrange else DataLabel,
-                        fontWeight = FontWeight.Bold
+                        style = MaterialTheme.typography.caption,
+                        color = if (state.isPaused) palette.warning else palette.hudLabel,
+                        fontWeight = FontWeight.Medium,
                     )
-                    Card(
-                        modifier = Modifier.fillMaxWidth().border(1.dp, GlassBorder, RoundedCornerShape(14.dp)),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color(0x33FFFFFF)),
-                    ) {
-                        DataGrid(state, Modifier.padding(vertical = 4.dp))
-                    }
+                    Spacer(Modifier.height(Space.md))
+                    DataGrid(state)
                     Spacer(Modifier.weight(1f))
-                    
-                    // 双重操作控制按钮组合
+
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(Space.sm),
                     ) {
-                        Surface(
+                        Button(
                             onClick = onTogglePause,
-                            shape = RoundedCornerShape(12.dp),
-                            color = if (state.isPaused) BrandCyan else PauseOrange,
-                            contentColor = Color(0xFF060913),
-                            modifier = Modifier.weight(1f).height(46.dp)
+                            shape = RoundedCornerShape(Radius.md),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (state.isPaused) palette.primary else palette.surfaceVariant,
+                                contentColor = if (state.isPaused) palette.onPrimary else palette.textPrimary,
+                            ),
+                            modifier = Modifier.weight(1f).height(48.dp),
                         ) {
-                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(
-                                    if (state.isPaused) "▶ 恢复" else "⏸ 暂停",
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
+                            Icon(
+                                imageVector = if (state.isPaused) Icons.Filled.PlayArrow else Icons.Filled.Pause,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Spacer(Modifier.width(Space.xs))
+                            Text(
+                                if (state.isPaused) "继续" else "暂停",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.SemiBold,
+                            )
                         }
-                        
-                        Surface(
+                        Button(
                             onClick = { showStopConfirm = true },
-                            shape = RoundedCornerShape(12.dp),
-                            color = StopRed,
-                            contentColor = Color.White,
-                            modifier = Modifier.weight(1.3f).height(46.dp)
+                            shape = RoundedCornerShape(Radius.md),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = palette.danger,
+                                contentColor = Color.White,
+                            ),
+                            modifier = Modifier.weight(1.25f).height(48.dp),
                         ) {
-                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text("结束骑行", fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                            }
+                            Icon(Icons.Outlined.Stop, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(Space.xs))
+                            Text("结束骑行", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
-                }
-
-                // 自动暂停时的半透明磨砂遮罩罩在数据区
-                if (state.isPaused) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color(0x33000000), RoundedCornerShape(24.dp))
-                            .clickable(onClick = onTogglePause)
-                    )
                 }
             }
         }
     }
 
-    // 误触确认对话框
     if (showStopConfirm) {
         AlertDialog(
             onDismissRequest = { showStopConfirm = false },
-            containerColor = CardBg,
-            titleContentColor = SpeedText,
-            textContentColor = DataLabel,
-            title = { Text("确认结束本次骑行？", fontWeight = FontWeight.Bold) },
-            text = { Text("本次骑行的轨迹与传感器数据将被封盘存入数据库并同步至云端。") },
+            shape = RoundedCornerShape(Radius.lg),
+            containerColor = palette.surface,
+            titleContentColor = palette.textPrimary,
+            textContentColor = palette.textSecondary,
+            title = { Text("结束本次骑行?", style = MaterialTheme.typography.title) },
+            text = {
+                Text(
+                    "本次轨迹与传感器数据将被保存到本地,并同步至云端(如已配置)。",
+                    style = MaterialTheme.typography.body,
+                )
+            },
             confirmButton = {
                 TextButton(onClick = { showStopConfirm = false; onStop() }) {
-                    Text("确认结束", color = StopRed, fontWeight = FontWeight.Bold)
+                    Text("确认结束", color = palette.danger, fontWeight = FontWeight.SemiBold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showStopConfirm = false }) {
-                    Text("继续骑行", color = BrandCyan)
+                    Text("继续骑行", color = palette.primary)
                 }
-            }
+            },
         )
     }
 }
-

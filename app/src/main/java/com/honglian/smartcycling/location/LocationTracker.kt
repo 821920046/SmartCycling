@@ -22,6 +22,13 @@ data class LocationSample(
     /** 与上一点的直线距离(米),用于里程积分。 */
     val deltaMeters: Double,
     val timestampMs: Long,
+    /**
+     * 该点是否可信:精度达标(≤25m)且不是跳点。
+     *
+     * 不可信的点**不应写入轨迹**(否则历史轨迹会出现尖刺),也**不应驱动"我的位置"标记**
+     * (否则车标会瞬移)。上层据此决定是否落库/移动标记。
+     */
+    val isReliable: Boolean = true,
 )
 
 /**
@@ -48,7 +55,7 @@ class LocationTracker(private val context: Context) {
                 var delta = 0.0
                 var isJumpPoint = false
 
-                if (prev != null && loc.accuracy <= 25f) {
+                if (prev != null && loc.accuracy <= ACCURACY_LIMIT_M) {
                     val d = prev.distanceTo(loc).toDouble()
                     val dt = (loc.time - prev.time) / 1000.0
                     
@@ -81,6 +88,8 @@ class LocationTracker(private val context: Context) {
                         speedKmh = finalSpeedKmh,
                         deltaMeters = delta,
                         timestampMs = System.currentTimeMillis(),
+                        // 精度达标且非跳点才可信:只有可信点才允许落库/移动车标。
+                        isReliable = !isJumpPoint && loc.accuracy <= ACCURACY_LIMIT_M,
                     ),
                 )
             }
@@ -88,5 +97,10 @@ class LocationTracker(private val context: Context) {
         client.requestLocationUpdates(request, callback, Looper.getMainLooper())
         awaitClose { client.removeLocationUpdates(callback) }
 
+    }
+
+    companion object {
+        /** 定位精度上限(米):超过该值的采样视为不可信。 */
+        private const val ACCURACY_LIMIT_M = 25f
     }
 }

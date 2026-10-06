@@ -26,7 +26,8 @@ export default {
       await ensureSchema(env)
 
       if (path === "/api/rides" && request.method === "POST") {
-        if (!checkToken(request, url, env)) return json({ error: "unauthorized" }, 401, cors)
+        const denied = denyIfUnauthorized(request, url, env, cors)
+        if (denied) return denied
         const b = await request.json()
         if (!b || !b.id) return json({ error: "missing id" }, 400, cors)
         await env.DB.prepare(
@@ -53,7 +54,8 @@ export default {
       }
 
       if (path === "/api/rides" && request.method === "GET") {
-        if (!checkToken(request, url, env)) return json({ error: "unauthorized" }, 401, cors)
+        const denied = denyIfUnauthorized(request, url, env, cors)
+        if (denied) return denied
         const res = await env.DB.prepare(
           "SELECT * FROM rides ORDER BY started_at DESC LIMIT 500"
         ).all()
@@ -61,7 +63,8 @@ export default {
       }
 
       if (path.startsWith("/api/rides/") && request.method === "GET") {
-        if (!checkToken(request, url, env)) return json({ error: "unauthorized" }, 401, cors)
+        const denied = denyIfUnauthorized(request, url, env, cors)
+        if (denied) return denied
         const id = decodeURIComponent(path.substring("/api/rides/".length))
         const ride = await env.DB.prepare("SELECT * FROM rides WHERE id = ?").bind(id).first()
         const tp = await env.DB.prepare(
@@ -84,16 +87,48 @@ function json(obj, status, extra) {
   })
 }
 
-function tokenOf(request, url) {
+function tokenOf(request) {
   const h = request.headers.get("Authorization") || ""
-  if (h.indexOf("Bearer ") === 0) return h.slice(7).trim()
-  return (url.searchParams.get("token") || "").trim()
+  if (h.indexOf("Bearer ") !== 0) return ""
+  return h.slice(7).trim()
 }
 
+/**
+ * 恒定时间比较,避免通过响应时间侧信道逐字节爆破令牌。
+ * 长度不同时依然走完整比较流程。
+ */
+function safeEqual(a, b) {
+  if (typeof a !== "string" || typeof b !== "string") return false
+  const len = Math.max(a.length, b.length)
+  let diff = a.length ^ b.length
+  for (let i = 0; i < len; i++) {
+    diff |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0)
+  }
+  return diff === 0
+}
+
+/**
+ * 令牌校验:默认**失败关闭**(fail-closed)。
+ * 若服务端未配置 SYNC_TOKEN,一律拒绝并给出明确提示 —— 否则一个忘记配置的部署
+ * 会把全部骑行数据(含精确轨迹)暴露给任何知道地址的人。
+ * 不再支持从 URL 查询参数取令牌(会随日志/Referer 泄漏)。
+ */
 function checkToken(request, url, env) {
   const expected = ((env && env.SYNC_TOKEN) || "").trim()
-  if (!expected) return true // 未设令牌则不校验(方便快速试用)
-  return tokenOf(request, url) === expected
+  if (!expected) {
+    return { ok: false, reason: "server_token_not_configured" }
+  }
+  const provided = tokenOf(request)
+  if (!provided) return { ok: false, reason: "missing_token" }
+  return safeEqual(provided, expected) ? { ok: true } : { ok: false, reason: "invalid_token" }
+}
+
+/** 未通过校验时返回可直接下发的 Response,通过则返回 null。 */
+function denyIfUnauthorized(request, url, env, cors) {
+  const a = checkToken(request, url, env)
+  if (a.ok) return null
+  const status = a.reason === "server_token_not_configured" ? 503 : 401
+  return json({ error: a.reason }, status, cors)
 }
 
 async function ensureSchema(env) {
@@ -257,6 +292,11 @@ const DASHBOARD_HTML = `<!doctype html>
         $('#list-container').innerHTML='<div class="text-center py-8 text-rose-500 font-bold"><i class="fa-solid fa-triangle-exclamation mb-2 text-xl"></i><br>安全令牌无效，请在右上方重新输入</div>';
         return;
       }
+      if(r.status===503){
+        $('#tip').textContent='✘ 服务端未配置令牌';
+        $('#list-container').innerHTML='<div class="text-center py-8 text-amber-500 font-bold"><i class="fa-solid fa-key mb-2 text-xl"></i><br>服务端尚未设置 SYNC_TOKEN<br><span class="text-xs font-normal text-slate-400">请执行 wrangler secret put SYNC_TOKEN 后重试</span></div>';
+        return;
+      }
       var data=await r.json();
       var list=data.rides||[];
       
@@ -284,9 +324,9 @@ const DASHBOARD_HTML = `<!doctype html>
             '<span class="text-[10px] bg-cyan-500/10 text-cyan-400 px-2 py-0.5 rounded font-black border border-cyan-500/20"><i class="fa-solid fa-user mr-1"></i>' + (x.rider||'未知骑手') + '</span>' +
           '</div>' +
           '<div class="grid grid-cols-3 gap-2 mt-3">' +
-            '<div><p class="text-[10px] text-slate-500 font-bold">里程</p><p class="text-sm font-black text-slate-200">' + x.distance_km.toFixed(2) + ' km</p></div>' +
+            '<div><p class="text-[10px] text-slate-500 font-bold">里程</p><p class="text-sm font-black text-slate-200">' + Number(x.distance_km||0).toFixed(2) + ' km</p></div>' +
             '<div><p class="text-[10px] text-slate-500 font-bold">时长</p><p class="text-sm font-black text-slate-200">' + fmtDur(x.duration_sec) + '</p></div>' +
-            '<div><p class="text-[10px] text-slate-500 font-bold">均速</p><p class="text-sm font-black text-slate-200">' + x.avg_speed_kmh.toFixed(1) + ' km/h</p></div>' +
+            '<div><p class="text-[10px] text-slate-500 font-bold">均速</p><p class="text-sm font-black text-slate-200">' + Number(x.avg_speed_kmh||0).toFixed(1) + ' km/h</p></div>' +
           '</div>';
         
         card.onclick = function() { selectRide(x) };

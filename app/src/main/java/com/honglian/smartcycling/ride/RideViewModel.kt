@@ -109,8 +109,11 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
             if (_state.value.isPaused) return@collect
             lastGpsSpeed = sample.speedKmh
             lastGpsAt = System.currentTimeMillis()
-            _currentLatLng.value = LatLng(sample.latitude, sample.longitude)
             distanceMeters += sample.deltaMeters
+            // 跳点 / 低精度点:仅用于保活 GPS 看门狗,不写入轨迹、不移动车标 ——
+            // 否则隧道/高架的漂移点会在历史轨迹上留下一段明显的尖刺。
+            if (!sample.isReliable) return@collect
+            _currentLatLng.value = LatLng(sample.latitude, sample.longitude)
             trackPoints += TrackPointEntity(
                 rideId = 0,
                 latitude = sample.latitude,

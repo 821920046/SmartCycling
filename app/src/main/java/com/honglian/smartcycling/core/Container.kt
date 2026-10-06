@@ -6,6 +6,7 @@ import com.honglian.smartcycling.cloud.CloudSyncRepository
 import com.honglian.smartcycling.data.AppDatabase
 import com.honglian.smartcycling.data.RideRepository
 import com.honglian.smartcycling.location.LocationTracker
+import com.honglian.smartcycling.offline.OfflineMapRepository
 import com.honglian.smartcycling.pairing.PairingRepository
 
 /**
@@ -19,6 +20,11 @@ class Container(context: Context) {
     val database: AppDatabase by lazy { AppDatabase.get(appContext) }
     val rideRepository: RideRepository by lazy { RideRepository(database.rideDao()) }
     val cloudSyncRepository: CloudSyncRepository by lazy { CloudSyncRepository() }
+
+    /** 离线地图仓库:导入/列举/删除/激活本地瓦片包。 */
+    val offlineMapRepository: OfflineMapRepository by lazy {
+        OfflineMapRepository(appContext, database.offlineMapDao())
+    }
 
     /** 传感器创建时应用已保存的车轮周长。 */
     val sensorManager: S314Manager by lazy {

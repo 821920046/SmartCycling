@@ -1,6 +1,5 @@
 package com.honglian.smartcycling.ui.components
 
-import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -12,116 +11,96 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.honglian.smartcycling.ui.theme.BrandCyan
-import com.honglian.smartcycling.ui.theme.BrandGreen
-import com.honglian.smartcycling.ui.theme.DataLabel
-import com.honglian.smartcycling.ui.theme.RingTrack
-import com.honglian.smartcycling.ui.theme.SpeedText
+import com.honglian.smartcycling.ui.theme.AppTheme
 import kotlin.math.roundToInt
 
-
-/** 极致科幻霓虹数值仪表盘(速度/踏频共用) */
+/**
+ * 环形数值仪表(速度 / 踏频共用)。
+ *
+ * 视觉原则:去掉发光与霓虹渐变,改用**单一强调色 + 高对比数字**。
+ * 户外强光下,可读性来自"对比度与字号",而不是"发光特效"。
+ */
 @Composable
 fun SpeedRing(
     value: Double,
+    unit: String,
+    maxValue: Double,
+    diameterDp: Int,
+    accent: Color,
     modifier: Modifier = Modifier,
-    unit: String = "km/h",
-    maxValue: Double = 60.0,
-    diameterDp: Int = 200,
 ) {
-    // 平滑数值动画，消除数据跳跃造成的闪烁感
-    val animatedValue by animateFloatAsState(
-        targetValue = value.toFloat(),
-        animationSpec = tween(durationMillis = 300, easing = LinearOutSlowInEasing),
-        label = "RingValue"
+    val palette = AppTheme.palette
+    val animated by animateFloatAsState(
+        targetValue = value.toFloat().coerceIn(0f, maxValue.toFloat()),
+        animationSpec = tween(durationMillis = 320),
+        label = "ring",
     )
 
     Box(contentAlignment = Alignment.Center, modifier = modifier.size(diameterDp.dp)) {
         Canvas(Modifier.size(diameterDp.dp)) {
-            val centerOffset = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)
-            val strokeWidth = (diameterDp * 0.06f).dp.toPx()
-            val radius = (size.minDimension - strokeWidth) / 2.0f
+            val stroke = (diameterDp * 0.055f).dp.toPx()
+            val tickZone = (diameterDp * 0.085f).dp.toPx()
+            val ringRadius = (size.minDimension - stroke) / 2f - tickZone
+            val center = Offset(size.width / 2f, size.height / 2f)
 
-            // 1. 绘制科幻外圈刻度尺 (24根刻度线, 每15度一根)
-            val tickCount = 24
-            val tickLength = (diameterDp * 0.04f).dp.toPx()
-            val tickStroke = 2.dp.toPx()
-            for (i in 0 until tickCount) {
-                val angle = i * (360f / tickCount)
-                rotate(angle) {
+            // 刻度:每 6° 一根,每 30° 加长加粗
+            val tickBase = ringRadius + stroke * 0.75f
+            for (i in 0 until 60) {
+                val major = i % 5 == 0
+                val len = if (major) tickZone * 0.55f else tickZone * 0.3f
+                rotate(degrees = i * 6f, pivot = center) {
                     drawLine(
-                        color = Color(0x2600F0FF), // 弱发光青
-                        start = androidx.compose.ui.geometry.Offset(centerOffset.x, strokeWidth * 0.5f),
-                        end = androidx.compose.ui.geometry.Offset(centerOffset.x, strokeWidth * 0.5f + tickLength),
-                        strokeWidth = tickStroke
+                        color = palette.hudLabel.copy(alpha = if (major) 0.55f else 0.25f),
+                        start = Offset(center.x, tickBase),
+                        end = Offset(center.x, tickBase + len),
+                        strokeWidth = if (major) 2.2f.dp.toPx() else 1.1f.dp.toPx(),
+                        cap = StrokeCap.Round,
                     )
                 }
             }
 
-            // 2. 绘制深色底轨道
             drawCircle(
-                color = RingTrack,
-                radius = radius,
-                style = Stroke(strokeWidth, cap = StrokeCap.Round)
+                color = palette.hudTrack,
+                radius = ringRadius,
+                style = Stroke(stroke, cap = StrokeCap.Round),
             )
 
-            // 计算进度比例
-            val fraction = (animatedValue / maxValue).coerceIn(0.0, 1.0).toFloat()
-            val sweepAngle = fraction * 360f
-
-            if (sweepAngle > 0f) {
-                val brush = Brush.sweepGradient(
-                    colors = listOf(BrandCyan, BrandGreen, BrandCyan),
-                    center = centerOffset
-                )
-
-                // 3. 绘制底层发光霓虹晕 (较粗，半透明)
+            val fraction = (animated / maxValue).coerceIn(0.0, 1.0).toFloat()
+            if (fraction > 0.001f) {
                 drawArc(
-                    brush = brush,
+                    color = accent,
                     startAngle = -90f,
-                    sweepAngle = sweepAngle,
+                    sweepAngle = fraction * 360f,
                     useCenter = false,
-                    style = Stroke(strokeWidth * 1.5f, cap = StrokeCap.Round),
-                    alpha = 0.25f
-                )
-
-                // 4. 绘制前台流光主轨道 (标准粗度，全亮)
-                drawArc(
-                    brush = brush,
-                    startAngle = -90f,
-                    sweepAngle = sweepAngle,
-                    useCenter = false,
-                    style = Stroke(strokeWidth, cap = StrokeCap.Round)
+                    topLeft = Offset(center.x - ringRadius, center.y - ringRadius),
+                    size = androidx.compose.ui.geometry.Size(ringRadius * 2, ringRadius * 2),
+                    style = Stroke(stroke, cap = StrokeCap.Round),
                 )
             }
         }
-        
-        // 中心数字及单位
+
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = "${animatedValue.roundToInt()}",
-                fontSize = (diameterDp / 3.2f).sp,
-                fontWeight = FontWeight.Black,
-                color = SpeedText,
-                fontFamily = FontFamily.Monospace // 等宽字体防止跳动
+                text = "${animated.roundToInt()}",
+                fontSize = (diameterDp / 3.3f).sp,
+                fontWeight = FontWeight.Bold,
+                color = palette.hudValue,
             )
             Text(
-                text = unit.uppercase(),
-                fontSize = (diameterDp / 11f).sp,
-                fontWeight = FontWeight.Bold,
-                color = DataLabel,
-                letterSpacing = 1.sp
+                text = unit,
+                fontSize = (diameterDp / 12f).sp,
+                fontWeight = FontWeight.Medium,
+                color = palette.hudLabel,
+                letterSpacing = 1.sp,
             )
         }
     }
 }
-

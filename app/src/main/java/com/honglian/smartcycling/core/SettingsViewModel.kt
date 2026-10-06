@@ -8,8 +8,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * 设置视图模型:管理车轮尺寸选择。
- * 选择后同时持久化并实时代入传感器速度/里程计算。
+ * 设置视图模型:管理车轮尺寸、主题模式与地图数据源。
+ * 所有修改同时持久化并即时生效。
  */
 class SettingsViewModel(app: Application) : AndroidViewModel(app) {
 
@@ -27,8 +27,12 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     private val _cloudSyncToken = MutableStateFlow(container.settings.cloudSyncToken)
     val cloudSyncToken: StateFlow<String> = _cloudSyncToken.asStateFlow()
 
-    private val _mapType = MutableStateFlow(container.settings.mapType)
-    val mapType: StateFlow<Int> = _mapType.asStateFlow()
+    // 这几项直接复用 Settings 内的共享流(而非各自 new 一个 MutableStateFlow),
+    // 以保证与 OfflineMapsViewModel 等其它写入方始终读到同一份最新状态。
+    val mapType: StateFlow<Int> = container.settings.mapTypeFlow
+    val themeMode: StateFlow<ThemeMode> = container.settings.themeModeFlow
+    val mapSource: StateFlow<MapSource> = container.settings.mapSourceFlow
+    val activeOfflineMapId: StateFlow<Long> = container.settings.activeOfflineMapIdFlow
 
     fun select(preset: WheelPreset) {
         container.settings.wheelPreset = preset
@@ -37,8 +41,10 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun updateRiderName(name: String) {
-        container.settings.riderName = name
-        _riderName.value = name
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) return
+        container.settings.riderName = trimmed
+        _riderName.value = trimmed
     }
 
     fun updateCloudSyncUrl(url: String) {
@@ -53,7 +59,19 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
 
     fun updateMapType(type: Int) {
         container.settings.mapType = type
-        _mapType.value = type
+    }
+
+    fun updateThemeMode(mode: ThemeMode) {
+        container.settings.themeMode = mode
+    }
+
+    fun updateMapSource(source: MapSource) {
+        container.settings.mapSource = source
+    }
+
+    /** 选中某张离线地图并自动切到离线引擎。 */
+    fun activateOfflineMap(id: Long) {
+        container.settings.activeOfflineMapId = id
+        if (id > 0) container.settings.mapSource = MapSource.OFFLINE
     }
 }
-
