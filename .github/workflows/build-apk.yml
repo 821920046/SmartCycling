@@ -20,6 +20,14 @@ jobs:
 
       - name: 安装 Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # 必须显式覆盖 packages，不能用 action 的默认值 "tools platform-tools"：
+          # Google 已从 SDK 仓库下架独立的 `tools` 包（被 cmdline-tools 取代），
+          # 新版 sdkmanager 遇到找不到的包会直接 exit 1，导致整步失败、根本进不到编译阶段。
+          # 这里只装本项目真正需要的：platform-tools + compileSdk 34 对应的 platform 与 build-tools，
+          # 顺带摆脱对 GitHub runner 镜像预装内容的隐式依赖。
+          packages: "platform-tools platforms;android-34 build-tools;34.0.0"
+          accept-android-sdk-licenses: true
 
       - name: 准备 Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
