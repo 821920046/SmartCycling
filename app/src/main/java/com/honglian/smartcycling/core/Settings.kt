@@ -120,6 +120,36 @@ class Settings(context: Context) {
             _activeOfflineMapId.value = value
         }
 
+    /** 骑手体重(kg),用于卡路里估算。 */
+    var riderWeightKg: Float
+        get() = prefs.getFloat(KEY_WEIGHT, 65f)
+        set(value) { prefs.edit().putFloat(KEY_WEIGHT, value).apply() }
+
+    /** 是否开启自动暂停(静止自动暂停计时)。 */
+    var autoPauseEnabled: Boolean
+        get() = prefs.getBoolean(KEY_AUTO_PAUSE, true)
+        set(value) { prefs.edit().putBoolean(KEY_AUTO_PAUSE, value).apply() }
+
+    /** 自动暂停触发的速度阈值(km/h)。 */
+    var autoPauseThresholdKmh: Float
+        get() = prefs.getFloat(KEY_AUTO_PAUSE_TH, 1.5f)
+        set(value) { prefs.edit().putFloat(KEY_AUTO_PAUSE_TH, value).apply() }
+
+    /** 日照高对比模式(强光下提升仪表盘可读性)。 */
+    var highContrast: Boolean
+        get() = prefs.getBoolean(KEY_HIGH_CONTRAST, false)
+        set(value) { prefs.edit().putBoolean(KEY_HIGH_CONTRAST, value).apply() }
+
+    /** 首次引导是否已展示。 */
+    var onboardingShown: Boolean
+        get() = prefs.getBoolean(KEY_ONBOARDING, false)
+        set(value) { prefs.edit().putBoolean(KEY_ONBOARDING, value).apply() }
+
+    /** 仅本地模式:开启后骑行记录只保存在本机,不上传云端。 */
+    var localOnlyMode: Boolean
+        get() = prefs.getBoolean(KEY_LOCAL_ONLY, false)
+        set(value) { prefs.edit().putBoolean(KEY_LOCAL_ONLY, value).apply() }
+
     companion object {
         private const val KEY_WHEEL = "wheel_preset"
         private const val KEY_DEVICE_ID = "device_id"
@@ -130,6 +160,12 @@ class Settings(context: Context) {
         private const val KEY_THEME = "theme_mode"
         private const val KEY_MAP_SOURCE = "map_source"
         private const val KEY_ACTIVE_MAP = "active_offline_map_id"
+        private const val KEY_WEIGHT = "rider_weight_kg"
+        private const val KEY_AUTO_PAUSE = "auto_pause_enabled"
+        private const val KEY_AUTO_PAUSE_TH = "auto_pause_threshold"
+        private const val KEY_HIGH_CONTRAST = "high_contrast"
+        private const val KEY_ONBOARDING = "onboarding_shown"
+        private const val KEY_LOCAL_ONLY = "local_only_mode"
     }
 }
 

@@ -16,6 +16,8 @@ data class RideEntity(
     val avgSpeedKmh: Double,
     val maxSpeedKmh: Double,
     val avgCadenceRpm: Double,
+    val calories: Double = 0.0,
+    val elevationGainM: Double = 0.0,
 )
 
 /** 轨迹点,关联到具体骑行。 */

@@ -41,6 +41,8 @@ class MainActivity : ComponentActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        // 全局方向：默认竖屏(手机竖放)，手机横过来自动横屏（SENSOR 无视系统自动旋转锁）
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR
 
         val crashLog = CrashHandler.consumeCrashLog(this)
 
@@ -53,15 +55,17 @@ class MainActivity : ComponentActivity() {
                 var crash by remember { mutableStateOf(crashLog) }
                 AppNav(
                     onPaired = {
-                        // 配对完成进入地图即锁定横屏,方便横屏输入目的地与导航
-                        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                        // 全程跟随手机方向自适应(默认竖屏，横放自动横屏)
+                        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR
                     },
                     onEnterRide = {
-                        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                        // 导航界面跟随手机方向自动横/竖屏(SENSOR:竖放竖屏、横放横屏)
+                        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR
                         startRideService()
                     },
                     onExitRide = {
-                        // 退出骑行回到地图,保持横屏(方便继续换目的地),仅停止前台服务
+                        // 退出骑行保持方向自适应,仅停止前台服务
+                        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR
                         stopRideService()
                     },
                 )

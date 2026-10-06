@@ -27,6 +27,13 @@
 
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
 
+    <!-- Android 11+ 对 TTS 服务有包可见性限制；缺少此声明会导致 TextToSpeech 初始化失败且无提示音。 -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+    </queries>
+
     <application
         android:name=".SmartCyclingApp"
         android:allowBackup="true"

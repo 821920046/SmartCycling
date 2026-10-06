@@ -1,220 +1,213 @@
 package com.honglian.smartcycling.ui.components
 
-import android.os.Bundle
+import android.location.Location
+import android.media.AudioAttributes
+import android.speech.tts.TextToSpeech
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
 import com.amap.api.maps.model.LatLng
-import com.amap.api.navi.AMapNavi
-import com.amap.api.navi.AMapNaviView
-import com.amap.api.navi.SimpleNaviListener
-import com.amap.api.navi.enums.NaviType
-import com.amap.api.navi.model.AMapCalcRouteResult
-import com.amap.api.navi.model.NaviLatLng
+import kotlinx.coroutines.delay
+import java.util.Locale
+import kotlin.math.abs
 
 /**
- * 完整 turn-by-turn 骑行导航视图(基于 AMapNaviView)。
- * - 自动展示转向箭头、车道信息、剩余距离/时间等导航 UI。
- * - 开启自动锁车(autoLockCar):相机始终跟随并居中当前车辆位置(街道级)。
- * - 语音使用高德内置语音播报(setUseInnerVoice),由 voiceEnabled 实时开关。
- * - 健壮性:若导航 SDK 初始化失败(如 Key 未开通导航权限),
- *   自动回退到普通跟随地图,绝不闪退。
+ * turn-by-turn 语音诱导（纯框架实现，零原生导航引擎）。
+ *
+ * 第一性原则重构背景：
+ * 旧方案基于高德导航引擎 AMapNavi（getInstance/startNavi/内置TTS），该引擎是 native(C/C++) 密集组件，
+ * 其 native 崩溃会绕过所有 Java 层 runCatching 与全局 CrashHandler，直接杀进程回桌面且不留 Java 日志——
+ * 这正是“点击开始骑行直接闪退到桌面、无崩溃弹窗”的病根。
+ *
+ * 现彻底移除 AMapNavi：
+ * - 可见地图/路线/跟随仍由 NavigationMapView(地图 SDK) 负责，稳定可靠。
+ * - 转向卡与里程/ETA 由“已规划路线折线 + App 真实定位”做纯几何推算得出。
+ * - 语音走系统 TextToSpeech（中文），与任何第三方 native 库无关。
+ * - 全程 runCatching 兜底：任何异常只影响语音提示，绝不影响地图或导致闪退。
  */
-/**
- * 安全从 Compose Context 中剥离出原始 Activity，防止部分 SDK 初始化因 ContextWrapper 抛异常。
- */
-internal fun android.content.Context.findActivity(): android.app.Activity? {
-    var context = this
-    while (context is android.content.ContextWrapper) {
-        if (context is android.app.Activity) return context
-        context = context.baseContext
-    }
-    return null
-}
-
 @Composable
-fun NaviMapView(
+fun NaviVoiceGuide(
     destination: LatLng,
-    voiceEnabled: Boolean,
+    startPoint: LatLng?,
+    currentLatLng: LatLng?,
     routePoints: List<LatLng> = emptyList(),
-    startPoint: LatLng? = null,
-    currentLatLng: LatLng? = null,
-    onExitRequested: () -> Unit = {},
-    modifier: Modifier = Modifier,
-    mapType: Int = 3,
+    enabled: Boolean,
+    onNaviInfo: (NaviBannerInfo?) -> Unit = {},
+    onRoutePath: (List<LatLng>) -> Unit = {},
 ) {
     val context = LocalContext.current
-    val appContext = context.applicationContext
-    val lifecycleOwner = LocalLifecycleOwner.current
-    val activityContext = context.findActivity() ?: context
-
-    // 导航视图/实例创建可能因 Key 未开通导航、资源缺失等抛异常。
-    // 一律 runCatching 兑底,失败则 naviView 为 null 并回退到跟随地图。
-    val naviView = remember { runCatching { AMapNaviView(activityContext) }.getOrNull() }
-    val navi = remember { runCatching { AMapNavi.getInstance(appContext) }.getOrNull() }
+    val enabledState = rememberUpdatedState(enabled)
+    val routeState = rememberUpdatedState(routePoints)
+    val locState = rememberUpdatedState(currentLatLng)
     val destState = rememberUpdatedState(destination)
-    val startState = rememberUpdatedState(startPoint)
-    val exitState = rememberUpdatedState(onExitRequested)
+    val onNaviInfoState = rememberUpdatedState(onNaviInfo)
 
-    if (naviView == null) {
-        // 回退:普通跟随地图 + 目的地标记(仍可正常骑行,只是无转向语音)
-        NavigationMapView(
-            modifier = modifier,
-            routePoints = routePoints,
-            destination = destination,
-            follow = true,
-            followLocation = currentLatLng,
-            mapType = mapType,
-        )
-        return
+    val ttsReady = remember { mutableStateOf(false) }
+    // 系统 TextToSpeech（中文）。构造与语言设置全部兜底，初始化失败仅静音、不影响导航。
+    val tts = remember {
+        var engine: TextToSpeech? = null
+        engine = runCatching {
+            TextToSpeech(context.applicationContext) { status ->
+                if (status == TextToSpeech.SUCCESS) {
+                    runCatching {
+                        // 依次尝试多个中文 Locale，任一可用即采用；均不可用则回退系统默认（尽力播报）。
+                        val locales = listOf(Locale.SIMPLIFIED_CHINESE, Locale.CHINA, Locale.CHINESE)
+                        val ok = locales.firstOrNull { lc ->
+                            val r = engine?.setLanguage(lc)
+                            r == TextToSpeech.LANG_AVAILABLE ||
+                                r == TextToSpeech.LANG_COUNTRY_AVAILABLE ||
+                                r == TextToSpeech.LANG_COUNTRY_VAR_AVAILABLE
+                        }
+                        if (ok == null) engine?.setLanguage(Locale.getDefault())
+                        // 明确走“导航语音”音频通道，避免被普通媒体音量/静音策略错误路由。
+                        engine?.setAudioAttributes(
+                            AudioAttributes.Builder()
+                                .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
+                                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                                .build(),
+                        )
+                        engine?.setSpeechRate(0.95f)
+                    }
+                    // 初始化成功后先播一段短提示，验证引擎与音频通道；主循环随后播报完整路线信息。
+                    ttsReady.value = true
+                    runCatching {
+                        engine?.speak("骑行导航语音已开启", TextToSpeech.QUEUE_FLUSH, null, "nav_ready")
+                    }
+                }
+            }
+        }.getOrNull()
+        engine
     }
 
-    DisposableEffect(lifecycleOwner) {
-        runCatching { naviView.onCreate(Bundle()) }
-        // 自动锁车 + 保留底图,但隐藏所有原生导航 UI 覆盖层(黑色转向面板/剩余距离时间/全览退出/速度圈)。
-        // 做法:setLayoutVisible(true) 让底图正常渲染(setLayoutVisible(false) 会把底图也一起隐藏),
-        // 再通过“隐藏所有不含地图的兄弟视图分支”把原生覆盖 UI 全部 GONE 掉,
-        // 只留下干净的深色底图 + 蓝色路线 + 车标(即百度那种清爽导航样式)。
-        // 转向提示仍由内置语音播报;速度/数据在右侧仪表盘显示。
-
-        runCatching {
-            val options = naviView.viewOptions
-            options.setAutoLockCar(true)
-            options.setLayoutVisible(true)
-            options.isSettingMenuEnabled = false
-            options.isTrafficBarEnabled = false
-            options.isRouteListButtonShow = false
-            options.isTrafficLine = false
-            naviView.viewOptions = options
-        }
-        // 首次布局后隐藏原生覆盖层,并在 SDK 因导航事件重新显示时持续隐藏。
-        val hideOverlays = android.view.ViewTreeObserver.OnGlobalLayoutListener {
-            runCatching { hideNativeNaviOverlays(naviView) }
-        }
-        runCatching { naviView.viewTreeObserver.addOnGlobalLayoutListener(hideOverlays) }
-        var attachedListener: SimpleNaviListener? = null
-        if (navi != null) {
-            val listener = NaviCallbacks(navi, destState, startState, exitState)
-            runCatching { navi.addAMapNaviListener(listener) }
-            attachedListener = listener
-            runCatching { navi.setUseInnerVoice(voiceEnabled, false) }
-        }
-
-        val observer = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_RESUME -> runCatching { naviView.onResume() }
-                Lifecycle.Event.ON_PAUSE -> runCatching { naviView.onPause() }
-                else -> Unit
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-
+    DisposableEffect(Unit) {
         onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-            runCatching { naviView.viewTreeObserver.removeOnGlobalLayoutListener(hideOverlays) }
-            val l = attachedListener
-            if (navi != null && l != null) {
-                runCatching { navi.stopNavi() }
-                runCatching { navi.removeAMapNaviListener(l) }
-            }
-            runCatching { naviView.onDestroy() }
-            runCatching { AMapNavi.destroy() }
+            runCatching { tts?.stop() }
+            runCatching { tts?.shutdown() }
         }
     }
 
-    // 语音开关:实时切换高德内置语音播报
-    LaunchedEffect(voiceEnabled, navi) {
-        runCatching { navi?.setUseInnerVoice(voiceEnabled, false) }
+    // 语音关闭时立即静音
+    LaunchedEffect(enabled) {
+        if (!enabled) runCatching { tts?.stop() }
     }
 
-    // 动态监听地图样式变化
-    LaunchedEffect(mapType) {
-        val aMap = naviView?.map ?: return@LaunchedEffect
-        runCatching {
-            aMap.mapType = when (mapType) {
-                1 -> com.amap.api.maps.AMap.MAP_TYPE_NORMAL
-                2 -> com.amap.api.maps.AMap.MAP_TYPE_SATELLITE
-                else -> com.amap.api.maps.AMap.MAP_TYPE_NIGHT
+    // 主循环：每秒推算进度/转向并驱动转向卡与语音里程碑。
+    LaunchedEffect(Unit) {
+        fun speak(text: String) {
+            if (!enabledState.value || !ttsReady.value) return
+            runCatching { tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "nav") }
+        }
+
+        var announcedStart = false
+        var announcedArrive = false
+        var turnArmed = true
+
+        while (true) {
+            val here = locState.value
+            if (here != null) {
+                val info = computeGuidance(routeState.value, here, destState.value)
+                onNaviInfoState.value.invoke(info)
+
+                // 等 TTS 就绪再播报起步，避免初始化未完成时白白丢掉首播。
+                if (!announcedStart && ttsReady.value) {
+                    speak("开始骑行导航，全程约 %.1f 公里".format(info.routeRemainMeters / 1000.0))
+                    announcedStart = true
+                }
+                // 转向播报：接近转向点（<120m）时播报一次，转向点远离后重新武装
+                if (info.iconType != 1 && info.segRemainMeters in 1..120 && turnArmed) {
+                    val dir = if (info.iconType == 2) "左转" else "右转"
+                    speak("前方 %d 米%s".format(info.segRemainMeters, dir))
+                    turnArmed = false
+                } else if (info.iconType == 1 || info.segRemainMeters > 200) {
+                    turnArmed = true
+                }
+                // 到达播报
+                if (!announcedArrive && info.routeRemainMeters <= 50) {
+                    speak("即将到达目的地")
+                    announcedArrive = true
+                }
             }
+            delay(1000)
         }
     }
-
-    AndroidView(factory = { naviView!! }, modifier = modifier)
 }
 
+/** turn-by-turn 转向卡数据（由路线几何推算）。 */
+data class NaviBannerInfo(
+    val iconType: Int,
+    val nextRoad: String,
+    val segRemainMeters: Int,
+    val routeRemainMeters: Int,
+    val routeRemainSeconds: Int,
+)
 
 /**
- * 导航回调(继承官方空实现适配器 SimpleNaviListener,仅重写所需方法)。
- * - 退出拦截: 劫持所有 SDK 原生退出/到达行为，重定向到外部自定义大红按钮逻辑。
+ * 基于规划路线折线 + 当前位置推算导航信息：
+ * - routeRemainMeters：沿路线到终点的剩余距离。
+ * - iconType/segRemainMeters：前方最近一次明显转向（>=25°）的方向与距离；无转向则直行。
+ * - routeRemainSeconds：按约 15km/h 估算的剩余时间。
  */
-private class NaviCallbacks(
-    private val navi: AMapNavi,
-    private val destination: State<LatLng>,
-    private val startPoint: State<LatLng?>,
-    private val onExitRequested: State<() -> Unit>,
-) : SimpleNaviListener() {
-    override fun onInitNaviSuccess() {
-        val d = destination.value
-        val s = startPoint.value
-        runCatching {
-            if (s != null) {
-                navi.calculateRideRoute(
-                    NaviLatLng(s.latitude, s.longitude),
-                    NaviLatLng(d.latitude, d.longitude),
-                )
-            } else {
-                navi.calculateRideRoute(NaviLatLng(d.latitude, d.longitude))
-            }
+private fun computeGuidance(route: List<LatLng>, here: LatLng, dest: LatLng): NaviBannerInfo {
+    if (route.size < 2) {
+        val d = distMeters(here, dest).toInt()
+        return NaviBannerInfo(1, "", d, d, estSeconds(d))
+    }
+    // 最近折线顶点
+    var ni = 0
+    var best = Double.MAX_VALUE
+    for (i in route.indices) {
+        val dd = distMeters(here, route[i])
+        if (dd < best) {
+            best = dd
+            ni = i
         }
     }
-
-    override fun onCalculateRouteSuccess(routeResult: AMapCalcRouteResult?) {
-        runCatching { navi.startNavi(NaviType.GPS) }
-    }
-
-    /** 劫持到达目的地回调: 不做强制退出, 仅记录日志, 由用户手动按大红按钮结束 */
-    override fun onArriveDestination() { /* no-op — user decides when to stop */ }
-
-    /** 兜底: 部分情况下 SDK 仅回调此方法表示导航结束, 重定向到退出确认 */
-    override fun onEndEmulatorNavi() { runCatching { onExitRequested.value() } }
-
-}
-
-/** 判断某视图子树中是否包含地图渲染面(用于在隐藏原生覆盖层时保留底图)。 */
-private fun viewContainsMapSurface(v: android.view.View): Boolean {
-    if (v is android.view.SurfaceView || v is android.view.TextureView || v is android.opengl.GLSurfaceView) return true
-    val cn = v.javaClass.name
-    if (cn.contains("MapView", true) || cn.contains("GLMapView", true) || cn.contains("TextureMapView", true)) return true
-    if (v is android.view.ViewGroup) {
-        for (i in 0 until v.childCount) {
-            if (viewContainsMapSurface(v.getChildAt(i))) return true
+    // 沿路线剩余距离
+    var remaining = distMeters(here, route[ni])
+    for (i in ni until route.size - 1) remaining += distMeters(route[i], route[i + 1])
+    // 前方最近转向检测（500m 前瞻）
+    var acc = distMeters(here, route[ni])
+    var turnType = 1
+    var segRemain = remaining.toInt()
+    var found = false
+    var i = ni
+    while (i < route.size - 2 && acc <= 500.0) {
+        val inB = bearingDeg(route[i], route[i + 1])
+        val outB = bearingDeg(route[i + 1], route[i + 2])
+        var delta = outB - inB
+        while (delta > 180) delta -= 360
+        while (delta < -180) delta += 360
+        acc += distMeters(route[i], route[i + 1])
+        if (abs(delta) >= 25.0) {
+            turnType = if (delta > 0) 3 else 2 // 顺时针(正)=右转, 逆时针(负)=左转
+            segRemain = acc.toInt()
+            found = true
+            break
         }
+        i++
     }
-    return false
+    if (!found) {
+        turnType = 1
+        segRemain = remaining.toInt()
+    }
+    return NaviBannerInfo(turnType, "", segRemain, remaining.toInt(), estSeconds(remaining.toInt()))
 }
 
-/**
- * 隐藏 AMapNaviView 的所有原生 UI 覆盖层,仅保留底图分支。
- * 递归:只深入“包含地图”的分支去隐藏其覆盖兄弟;凡是“不含地图”的分支整体 GONE。
- * 与具体控件层级无关,稳健地移除黑色转向面板、剩余距离时间、全览/退出、速度圈等。
- */
-private fun hideNativeNaviOverlays(v: android.view.View) {
-    if (v !is android.view.ViewGroup) return
-    for (i in 0 until v.childCount) {
-        val c = v.getChildAt(i)
-        if (viewContainsMapSurface(c)) {
-            hideNativeNaviOverlays(c)
-        } else if (c.visibility != android.view.View.GONE) {
-            c.visibility = android.view.View.GONE
-        }
-    }
+private fun distMeters(a: LatLng, b: LatLng): Double {
+    val r = FloatArray(2)
+    Location.distanceBetween(a.latitude, a.longitude, b.latitude, b.longitude, r)
+    return r[0].toDouble()
 }
+
+private fun bearingDeg(a: LatLng, b: LatLng): Double {
+    val r = FloatArray(2)
+    Location.distanceBetween(a.latitude, a.longitude, b.latitude, b.longitude, r)
+    return r[1].toDouble()
+}
+
+/** 剩余时间估算：约 15km/h ≈ 4.2 m/s。 */
+private fun estSeconds(meters: Int): Int = (meters / 4.2).toInt()

@@ -32,4 +32,16 @@ interface RideDao {
 
     @Query("DELETE FROM rides WHERE id = :rideId")
     suspend fun deleteRide(rideId: Long)
+
+    @Query("DELETE FROM rides")
+    suspend fun deleteAllRides()
+
+    @Query("DELETE FROM track_points")
+    suspend fun deleteAllTrackPoints()
+
+    @Transaction
+    suspend fun clearAll() {
+        deleteAllTrackPoints()
+        deleteAllRides()
+    }
 }

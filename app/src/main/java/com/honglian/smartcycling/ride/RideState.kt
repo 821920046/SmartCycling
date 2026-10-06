@@ -17,6 +17,9 @@ data class RideState(
     val avgSpeedKmh: Double = 0.0,
     val maxSpeedKmh: Double = 0.0,
     val speedSource: SpeedSource = SpeedSource.GPS,
+    val calories: Double = 0.0,
+    val elevationGainM: Double = 0.0,
+    val sensorFresh: Boolean = false,
     val isRiding: Boolean = false,
     val isPaused: Boolean = false,
 ) {

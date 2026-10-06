@@ -15,8 +15,10 @@ import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.Speed
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material.icons.outlined.TrendingUp
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import com.honglian.smartcycling.ride.RideState
 import com.honglian.smartcycling.ride.SensorMode
 import com.honglian.smartcycling.ui.theme.AppTheme
+import com.honglian.smartcycling.ui.theme.DividerNavy
 import kotlin.math.roundToInt
 
 /**
@@ -80,6 +83,12 @@ fun DataGrid(state: RideState, modifier: Modifier = Modifier) {
                     alpha = dim,
                 )
             }
+        }
+        HorizontalDivider(color = DividerNavy)
+        Row(Modifier.fillMaxWidth()) {
+            DataCell(Modifier.weight(1f), "🔥 %.0f kcal".format(state.calories), "消耗热量")
+            VerticalDivider(color = DividerNavy)
+            DataCell(Modifier.weight(1f), "⛰ %.0f m".format(state.elevationGainM), "累计爬升")
         }
     }
 }

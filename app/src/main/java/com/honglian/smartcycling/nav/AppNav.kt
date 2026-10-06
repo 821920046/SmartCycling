@@ -39,6 +39,7 @@ object Routes {
     const val SETTINGS = "settings"
     const val HISTORY = "history"
     const val OFFLINE_MAPS = "offline_maps"
+    const val SUMMARY = "summary"
 }
 
 /**
@@ -96,6 +97,10 @@ fun AppNav(
     }
 
     var voiceEnabled by rememberSaveable { mutableStateOf(true) }
+    // 日照高对比模式(设置页可切换)
+    val highContrast by settingsViewModel.highContrast.collectAsState()
+    // 首次引导(未展示过则弹出一次)
+    var showOnboarding by rememberSaveable { mutableStateOf(!container.settings.onboardingShown) }
 
     NavHost(
         navController = navController,
@@ -167,26 +172,49 @@ fun AppNav(
         composable(Routes.RIDE) {
             val state by rideViewModel.state.collectAsState()
             val currentLatLng by rideViewModel.currentLatLng.collectAsState()
+            val traveledPath by rideViewModel.traveledPath.collectAsState()
             RideScreen(
                 state = state,
                 routePoints = routePoints,
                 destination = destination,
                 startPoint = startPoint,
                 currentLatLng = currentLatLng,
+                traveledPoints = traveledPath,
                 voiceEnabled = voiceEnabled,
                 onToggleVoice = { voiceEnabled = !voiceEnabled },
                 onTogglePause = { rideViewModel.togglePause() },
                 onStop = {
                     rideViewModel.stopRide()
-                    mapViewModel.reset()
                     onExitRide()
-                    navController.navigate(Routes.MAP) {
-                        popUpTo(Routes.RIDE) { inclusive = true }
+                    if (rideViewModel.lastSummary.value != null) {
+                        // 有有效成绩 → 进入成绩总结页
+                        navController.navigate(Routes.SUMMARY) {
+                            popUpTo(Routes.RIDE) { inclusive = true }
+                        }
+                    } else {
+                        // 误触发(时长过短):清空路线直接回地图
+                        mapViewModel.reset()
+                        navController.navigate(Routes.MAP) {
+                            popUpTo(Routes.RIDE) { inclusive = true }
+                        }
                     }
                 },
                 mapType = mapType,
                 mapSource = effectiveSource,
                 offlineSpec = activeOfflineSpec,
+                highContrast = highContrast
+            )
+        }
+        composable(Routes.SUMMARY) {
+            val summary by rideViewModel.lastSummary.collectAsState()
+            RideSummaryScreen(
+                state = summary,
+                onDone = {
+                    mapViewModel.reset()
+                    navController.navigate(Routes.MAP) {
+                        popUpTo(Routes.SUMMARY) { inclusive = true }
+                    }
+                },
             )
         }
 
@@ -218,5 +246,12 @@ fun AppNav(
                 offlineSpec = activeOfflineSpec,
             )
         }
+    }
+
+    if (showOnboarding) {
+        OnboardingDialog(onDismiss = {
+            container.settings.onboardingShown = true
+            showOnboarding = false
+        })
     }
 }

@@ -57,6 +57,7 @@ import com.honglian.smartcycling.data.RideEntity
 import com.honglian.smartcycling.data.TrackPointEntity
 import com.honglian.smartcycling.offline.OfflineLayerSpec
 import com.honglian.smartcycling.offline.OfflineMapView
+import com.honglian.smartcycling.offline.toWgs84
 import com.honglian.smartcycling.ui.components.NavigationMapView
 import com.honglian.smartcycling.ui.theme.AppTheme
 import com.honglian.smartcycling.ui.theme.Radius
@@ -218,6 +219,9 @@ fun HistoryScreen(
                         .clip(RoundedCornerShape(Radius.md))
                         .background(palette.surfaceVariant),
                 ) {
+                    // 轨迹点存的是 GCJ-02(高德定位),离线底图按 WGS-84 网格渲染 →
+                    // 离线分支必须先纠偏,否则历史轨迹会整体偏移 300~600 米。
+                    val wgsTrack = remember(trackPoints) { trackPoints.toWgs84() }
                     when {
                         loading -> CircularProgressIndicator(
                             color = palette.primary,
@@ -225,8 +229,8 @@ fun HistoryScreen(
                         )
                         mapSource == MapSource.OFFLINE && offlineSpec != null -> OfflineMapView(
                             spec = offlineSpec,
-                            routePoints = trackPoints,
-                            destination = trackPoints.lastOrNull(),
+                            routePoints = wgsTrack,
+                            destination = wgsTrack.lastOrNull(),
                             follow = false,
                             routeColor = palette.primary.toArgb(),
                             modifier = Modifier.fillMaxSize(),
@@ -315,6 +319,12 @@ private fun RideCard(
                     Spacer(Modifier.width(Space.md))
                     MiniFact(Icons.Outlined.Place, "均速 %.1f".format(ride.avgSpeedKmh))
                 }
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    "%.0f kcal · 爬升 %.0f m".format(ride.calories, ride.elevationGainM),
+                    style = MaterialTheme.typography.caption,
+                    color = palette.textSecondary,
+                )
                 Text(dateText, style = MaterialTheme.typography.caption, color = palette.textTertiary)
             }
             IconButton(onClick = onDelete) {

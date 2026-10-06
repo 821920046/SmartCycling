@@ -5,6 +5,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.amap.api.maps.model.LatLng
 import com.honglian.smartcycling.SmartCyclingApp
+import com.honglian.smartcycling.offline.GeoTransform
+import com.honglian.smartcycling.offline.MapCrs
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,17 +33,21 @@ class MapViewModel(app: Application) : AndroidViewModel(app) {
     private val container = (app as SmartCyclingApp).container
 
     /**
-     * 当前位置(WGS-84),用于在**离线底图**上绘制"我的位置"。
+     * 当前位置(**WGS-84**),用于在**离线底图**上绘制"我的位置"。
      *
-     * 关键:必须走 FusedLocation(WGS-84),**不能**用高德定位 ——
-     * 高德返回 GCJ-02,而离线瓦片按 WGS-84 网格渲染,直接喂进去车标会偏移 300~600m。
+     * 关键:定位源([com.honglian.smartcycling.location.LocationTracker])统一走高德定位,
+     * 输出 **GCJ-02**;而离线瓦片按 WGS-84 网格渲染,若直接喂进去车标会偏移 300~600m。
+     * 因此这里显式做一次 GCJ-02 → WGS-84 纠偏,保证"蓝点"与离线底图对齐。
      *
      * 采用 `WhileSubscribed`:只有地图页真正在观察时才启动定位,离开 5s 后自动停止,不长期耗电。
      * 无定位权限等异常静默降级为"不显示蓝点",不影响其余功能。
      */
     val currentLatLng: StateFlow<LatLng?> = container.locationTracker.track()
         .filter { it.isReliable }
-        .map { LatLng(it.latitude, it.longitude) }
+        .map {
+            val w = GeoTransform.convert(it.latitude, it.longitude, MapCrs.GCJ02, MapCrs.WGS84)
+            LatLng(w[0], w[1])
+        }
         .catch { emit(null) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 

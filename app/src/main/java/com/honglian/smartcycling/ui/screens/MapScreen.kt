@@ -67,6 +67,7 @@ import com.honglian.smartcycling.core.MapSource
 import com.honglian.smartcycling.core.WheelPreset
 import com.honglian.smartcycling.offline.OfflineLayerSpec
 import com.honglian.smartcycling.offline.OfflineMapView
+import com.honglian.smartcycling.offline.toWgs84
 import com.honglian.smartcycling.ui.components.NavigationMapView
 import com.honglian.smartcycling.ui.theme.AppTheme
 import com.honglian.smartcycling.ui.theme.Radius
@@ -116,10 +117,14 @@ fun MapScreen(
     Box(modifier.fillMaxSize().background(palette.background)) {
         // 1) 底图
         if (mapSource == MapSource.OFFLINE && offlineSpec != null) {
+            // 高德规划出的路线/目的地是 GCJ-02,而离线底图按 WGS-84 网格渲染 →
+            // 必须在此纠偏后再绘制,否则整条路线会偏移 300~600 米。
+            val wgsRoute = remember(routePoints) { routePoints.toWgs84() }
+            val wgsDest = remember(destination) { destination?.toWgs84() }
             OfflineMapView(
                 spec = offlineSpec,
-                routePoints = routePoints,
-                destination = destination,
+                routePoints = wgsRoute,
+                destination = wgsDest,
                 currentLocation = currentLocation,
                 follow = false,
                 routeColor = palette.primary.toArgb(),
@@ -201,7 +206,7 @@ fun MapScreen(
                                 SuggestionRow(poi) {
                                     focus.clearFocus()
                                     onSuggestionSelected(poi)
-                                    query = ""
+                                    query = "" // 清空输入框,避免空回填触发竞态联想
                                 }
                             }
                         }

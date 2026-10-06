@@ -8,6 +8,7 @@ import com.honglian.smartcycling.SmartCyclingApp
 import com.honglian.smartcycling.data.RideEntity
 import com.honglian.smartcycling.data.TrackPointEntity
 import com.honglian.smartcycling.location.LocationSample
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,9 +37,17 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
     private val _state = MutableStateFlow(RideState())
     val state: StateFlow<RideState> = _state.asStateFlow()
 
-    /** 当前真实定位(WGS-84,取自 FusedLocation),用于驱动导航地图跟随真实位置。 */
+    /** 当前真实定位(GCJ-02,取自高德 AMapLocation),用于语音诱导喂数与真实位置跟随。 */
     private val _currentLatLng = MutableStateFlow<LatLng?>(null)
     val currentLatLng: StateFlow<LatLng?> = _currentLatLng.asStateFlow()
+
+    /** 已骑行轨迹(GCJ-02),用于在地图上实时回放“走过的路”。 */
+    private val _traveledPath = MutableStateFlow<List<LatLng>>(emptyList())
+    val traveledPath: StateFlow<List<LatLng>> = _traveledPath.asStateFlow()
+
+    /** 最近一次完成骑行的成绩快照,用于结束后成绩总结页展示。 */
+    private val _lastSummary = MutableStateFlow<RideState?>(null)
+    val lastSummary: StateFlow<RideState?> = _lastSummary.asStateFlow()
 
     private var rideJob: Job? = null
     private val trackPoints = mutableListOf<TrackPointEntity>()
@@ -58,6 +67,14 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
     private var lastActiveAt = 0L
     private var accumulatedDurationSec = 0L
 
+    // 训练指标与偏好(startRide 时从设置载入)
+    private var elevationGain = 0.0
+    private var caloriesKcal = 0.0
+    private var lastAltitude: Double? = null
+    private var autoPauseEnabled = true
+    private var autoPauseThresholdKmh = 1.5
+    private var riderWeightKg = 65.0
+
     fun startRide() {
         if (_state.value.isRiding) return
         startTime = System.currentTimeMillis()
@@ -67,13 +84,22 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
         sensorMode = SensorMode.SPEED
         lastActiveAt = System.currentTimeMillis()
         accumulatedDurationSec = 0L
+        elevationGain = 0.0
+        caloriesKcal = 0.0
+        lastAltitude = null
+        autoPauseEnabled = settings.autoPauseEnabled
+        autoPauseThresholdKmh = settings.autoPauseThresholdKmh.toDouble()
+        riderWeightKg = settings.riderWeightKg.toDouble()
         trackPoints.clear()
+        _traveledPath.value = emptyList()
         _state.value = RideState(isRiding = true, isPaused = false)
 
         rideJob = viewModelScope.launch {
-            launch { collectSensor() }
-            launch { collectLocation() }
-            launch { ticker() }
+            // 采集协程兜底：任一数据源(传感器/GPS/计时)抛异常都只在本协程内消化，
+            // 绝不冒泡到 viewModelScope 触发未捕获异常导致整个 App 闪退。
+            launch { try { collectSensor() } catch (c: CancellationException) { throw c } catch (t: Throwable) {} }
+            launch { try { collectLocation() } catch (c: CancellationException) { throw c } catch (t: Throwable) {} }
+            launch { try { ticker() } catch (c: CancellationException) { throw c } catch (t: Throwable) {} }
         }
     }
 
@@ -110,10 +136,21 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
             lastGpsSpeed = sample.speedKmh
             lastGpsAt = System.currentTimeMillis()
             distanceMeters += sample.deltaMeters
-            // 跳点 / 低精度点:仅用于保活 GPS 看门狗,不写入轨迹、不移动车标 ——
+            // 跳点 / 低精度点:仅用于保活 GPS 看门狗,不写入轨迹、不移动车标、不累计爬升 ——
             // 否则隧道/高架的漂移点会在历史轨迹上留下一段明显的尖刺。
             if (!sample.isReliable) return@collect
-            _currentLatLng.value = LatLng(sample.latitude, sample.longitude)
+            val here = LatLng(sample.latitude, sample.longitude)
+            _currentLatLng.value = here
+            // 追加到已走轨迹(上限保护,防超长骑行内存膨胀)
+            val prevPath = _traveledPath.value
+            _traveledPath.value = if (prevPath.size >= 8000) prevPath.drop(1) + here else prevPath + here
+            // 累计爬升(GPS 高程,+0.5m 阈值过滤噪声)
+            val alt = sample.altitude
+            if (alt != 0.0) {
+                val prevAlt = lastAltitude
+                if (prevAlt != null && alt - prevAlt >= 0.5) elevationGain += (alt - prevAlt)
+                lastAltitude = alt
+            }
             trackPoints += TrackPointEntity(
                 rideId = 0,
                 latitude = sample.latitude,
@@ -126,6 +163,16 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
 
     private var lastGpsAt = 0L
     private fun hasFreshGps() = System.currentTimeMillis() - lastGpsAt < STALE_MS
+
+    /** 按骑行速度估算 MET(代谢当量),用于卡路里估算。 */
+    private fun metForSpeed(kmh: Double): Double = when {
+        kmh < 16.0 -> 4.0
+        kmh < 19.0 -> 6.8
+        kmh < 22.0 -> 8.0
+        kmh < 25.0 -> 10.0
+        kmh < 30.0 -> 12.0
+        else -> 15.8
+    }
 
     fun togglePause() {
         val s = _state.value
@@ -152,24 +199,25 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
                 else -> 0.0
             }
 
-            // 自动暂停判定：时速大于 1.5 km/h 判定为运动，否则为静止
-            val hasMotion = rawSpeed > 1.5
+            // 自动暂停判定：可配置阈值/开关;静止超 5 秒自动暂停,移动自动恢复
+            val hasMotion = rawSpeed > autoPauseThresholdKmh
             var nextPaused = stateVal.isPaused
 
             if (hasMotion) {
                 lastActiveAt = now
-                if (stateVal.isPaused) {
+                if (stateVal.isPaused && autoPauseEnabled) {
                     nextPaused = false // 自动恢复
                 }
             } else {
-                // 静止状态下，超过 5 秒未移动，自动暂停
-                if (!stateVal.isPaused && (now - lastActiveAt >= 5000L)) {
+                if (autoPauseEnabled && !stateVal.isPaused && (now - lastActiveAt >= 5000L)) {
                     nextPaused = true
                 }
             }
 
             if (!nextPaused) {
                 accumulatedDurationSec++
+                // 卡路里累计(MET × 体重 × 3.5 / 200 kcal/min,按秒累加)
+                caloriesKcal += metForSpeed(rawSpeed) * riderWeightKg * 3.5 / 200.0 / 60.0
             }
 
             val curCadence = if (now - lastCadenceAt < STALE_MS) cadence else 0.0
@@ -187,6 +235,9 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
                 avgSpeedKmh = avg,
                 maxSpeedKmh = maxOf(stateVal.maxSpeedKmh, rawSpeed),
                 speedSource = if (useSensor) SpeedSource.SENSOR_WHEEL else SpeedSource.GPS,
+                calories = caloriesKcal,
+                elevationGainM = elevationGain,
+                sensorFresh = sensorFresh,
                 isPaused = nextPaused
             )
         }
@@ -197,6 +248,8 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
         rideJob = null
         val s = _state.value
         _state.value = s.copy(isRiding = false, isPaused = false)
+        // 捕获成绩快照(时长过短视为误触发,不生成成绩)
+        _lastSummary.value = if (s.durationSec < 3) null else s
         if (s.durationSec < 3) return  // 忽略误触发
         val pointsSnapshot = trackPoints.toList()
         viewModelScope.launch {
@@ -208,10 +261,12 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
                 avgSpeedKmh = s.avgSpeedKmh,
                 maxSpeedKmh = s.maxSpeedKmh,
                 avgCadenceRpm = s.avgCadenceRpm,
+                calories = s.calories,
+                elevationGainM = s.elevationGainM,
             )
             val id = repository.saveRide(ride, pointsSnapshot)
-            // 自动上传云端中控
-            runCatching {
+            // 自动上传云端中控(仅本地模式下不联网上传)
+            if (!settings.localOnlyMode) runCatching {
                 cloudSync.upload(
                     deviceId = settings.deviceId,
                     rider = settings.riderName,

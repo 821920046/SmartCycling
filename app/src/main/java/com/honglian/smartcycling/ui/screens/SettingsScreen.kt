@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Cloud
+import androidx.compose.material.icons.outlined.DeleteForever
 import androidx.compose.material.icons.outlined.DirectionsBike
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Map
@@ -34,10 +35,13 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -62,7 +66,7 @@ import com.honglian.smartcycling.ui.theme.Radius
 import com.honglian.smartcycling.ui.theme.Space
 
 /**
- * 设置页:按"骑行档案 / 外观 / 地图数据 / 云端同步 / 关于"分组。
+ * 设置页:按"骑行档案 / 外观 / 地图数据 / 训练偏好 / 云端同步 / 关于"分组。
  * 所有可编辑项在离开页面时统一落盘,避免每次按键都写 SharedPreferences。
  */
 @Composable
@@ -80,12 +84,21 @@ fun SettingsScreen(
     val mapType by viewModel.mapType.collectAsState()
     val themeMode by viewModel.themeMode.collectAsState()
     val mapSource by viewModel.mapSource.collectAsState()
+    val riderWeight by viewModel.riderWeightKg.collectAsState()
+    val autoPauseEnabled by viewModel.autoPauseEnabled.collectAsState()
+    val autoPauseThreshold by viewModel.autoPauseThresholdKmh.collectAsState()
+    val highContrast by viewModel.highContrast.collectAsState()
+    val localOnly by viewModel.localOnly.collectAsState()
 
     var nameInput by remember(riderName) { mutableStateOf(riderName) }
+    // 注意:weightInput 不能用 riderWeight 作 remember 键 —— 每次输入都会写回 riderWeight,
+    // 用作键会导致输入框被重置、无法连续输入。
+    var weightInput by remember { mutableStateOf(riderWeight.toInt().toString()) }
     var urlInput by remember(cloudSyncUrl) { mutableStateOf(cloudSyncUrl) }
     var tokenInput by remember(cloudSyncToken) { mutableStateOf(cloudSyncToken) }
     var showWheelDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
+    var showClearConfirm by remember { mutableStateOf(false) }
 
     fun persist() {
         viewModel.updateRiderName(nameInput)
@@ -165,6 +178,13 @@ fun SettingsScreen(
                         onSelect = { viewModel.updateMapType(it) },
                         label = "默认地图图层(在线引擎)",
                     )
+                    Spacer(Modifier.height(Space.sm))
+                    SwitchRow(
+                        title = "日照高对比模式",
+                        subtitle = "强光下加深仪表盘背景、提升文字对比",
+                        checked = highContrast,
+                        onCheckedChange = { viewModel.updateHighContrast(it) },
+                    )
                 }
 
                 // ---- 地图数据 ----
@@ -181,6 +201,41 @@ fun SettingsScreen(
                         subtitle = "导入 MBTiles / ZIP / 瓦片文件夹,设置坐标系",
                         icon = Icons.Outlined.Map,
                         onClick = onNavigateToOfflineMaps,
+                    )
+                }
+
+                // ---- 训练与骑行偏好 ----
+                Section(icon = Icons.Outlined.DirectionsBike, title = "训练与骑行偏好") {
+                    OutlinedTextField(
+                        value = weightInput,
+                        onValueChange = {
+                            weightInput = it
+                            it.toFloatOrNull()?.let { w -> viewModel.updateRiderWeight(w) }
+                        },
+                        label = { Text("体重 (kg,用于卡路里估算)") },
+                        singleLine = true,
+                        shape = RoundedCornerShape(Radius.md),
+                        colors = fieldColors(),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(Space.sm))
+                    SwitchRow(
+                        title = "自动暂停",
+                        subtitle = "静止超过 5 秒自动暂停计时,恢复移动自动继续",
+                        checked = autoPauseEnabled,
+                        onCheckedChange = { viewModel.updateAutoPauseEnabled(it) },
+                    )
+                    Spacer(Modifier.height(Space.sm))
+                    Text(
+                        "自动暂停阈值:%.1f km/h".format(autoPauseThreshold),
+                        style = MaterialTheme.typography.caption,
+                        color = palette.textTertiary,
+                    )
+                    Slider(
+                        value = autoPauseThreshold,
+                        onValueChange = { viewModel.updateAutoPauseThreshold(it) },
+                        valueRange = 0.5f..5f,
+                        enabled = autoPauseEnabled,
                     )
                 }
 
@@ -212,6 +267,34 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.caption,
                         color = palette.textTertiary,
                     )
+                    Spacer(Modifier.height(Space.sm))
+                    SwitchRow(
+                        title = "仅本地模式",
+                        subtitle = "开启后骑行记录只存本机,绝不上传云端",
+                        checked = localOnly,
+                        onCheckedChange = { viewModel.updateLocalOnly(it) },
+                    )
+                    Spacer(Modifier.height(Space.xs))
+                    Text(
+                        "隐私说明:定位与轨迹仅用于导航和骑行统计,默认只保存在本机;仅当你填写上方服务器地址且未开启「仅本地模式」时才会上传。",
+                        style = MaterialTheme.typography.caption,
+                        color = palette.textTertiary,
+                    )
+                    Spacer(Modifier.height(Space.sm))
+                    OutlinedButton(
+                        onClick = { showClearConfirm = true },
+                        shape = RoundedCornerShape(Radius.md),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(
+                            Icons.Outlined.DeleteForever,
+                            contentDescription = null,
+                            tint = palette.danger,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(Space.sm))
+                        Text("清空本机全部骑行记录", color = palette.danger)
+                    }
                 }
 
                 // ---- 关于 ----
@@ -229,6 +312,27 @@ fun SettingsScreen(
                 }
             }
         }
+    }
+
+    if (showClearConfirm) {
+        AlertDialog(
+            onDismissRequest = { showClearConfirm = false },
+            shape = RoundedCornerShape(Radius.lg),
+            containerColor = palette.surface,
+            titleContentColor = palette.textPrimary,
+            textContentColor = palette.textSecondary,
+            title = { Text("清空全部记录?", style = MaterialTheme.typography.title) },
+            text = { Text("将删除本机所有骑行记录与轨迹点,操作不可撤销。", style = MaterialTheme.typography.body) },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.clearAllRides()
+                    showClearConfirm = false
+                }) { Text("清空", color = palette.danger, fontWeight = FontWeight.SemiBold) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearConfirm = false }) { Text("取消", color = palette.primary) }
+            },
+        )
     }
 
     if (showWheelDialog) {
@@ -302,6 +406,29 @@ private fun RowItem(
             Text(subtitle, style = MaterialTheme.typography.caption, color = palette.textTertiary)
         }
         Icon(Icons.Outlined.ChevronRight, contentDescription = null, tint = palette.textTertiary)
+    }
+}
+
+@Composable
+private fun SwitchRow(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    val palette = AppTheme.palette
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = Space.xs),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.body, color = palette.textPrimary)
+            Text(subtitle, style = MaterialTheme.typography.caption, color = palette.textTertiary)
+        }
+        Spacer(Modifier.width(Space.sm))
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 

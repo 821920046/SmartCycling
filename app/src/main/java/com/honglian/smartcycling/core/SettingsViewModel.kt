@@ -2,7 +2,9 @@ package com.honglian.smartcycling.core
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
 import com.honglian.smartcycling.SmartCyclingApp
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -33,6 +35,21 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     val themeMode: StateFlow<ThemeMode> = container.settings.themeModeFlow
     val mapSource: StateFlow<MapSource> = container.settings.mapSourceFlow
     val activeOfflineMapId: StateFlow<Long> = container.settings.activeOfflineMapIdFlow
+
+    private val _riderWeightKg = MutableStateFlow(container.settings.riderWeightKg)
+    val riderWeightKg: StateFlow<Float> = _riderWeightKg.asStateFlow()
+
+    private val _autoPauseEnabled = MutableStateFlow(container.settings.autoPauseEnabled)
+    val autoPauseEnabled: StateFlow<Boolean> = _autoPauseEnabled.asStateFlow()
+
+    private val _autoPauseThresholdKmh = MutableStateFlow(container.settings.autoPauseThresholdKmh)
+    val autoPauseThresholdKmh: StateFlow<Float> = _autoPauseThresholdKmh.asStateFlow()
+
+    private val _highContrast = MutableStateFlow(container.settings.highContrast)
+    val highContrast: StateFlow<Boolean> = _highContrast.asStateFlow()
+
+    private val _localOnly = MutableStateFlow(container.settings.localOnlyMode)
+    val localOnly: StateFlow<Boolean> = _localOnly.asStateFlow()
 
     fun select(preset: WheelPreset) {
         container.settings.wheelPreset = preset
@@ -73,5 +90,39 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun activateOfflineMap(id: Long) {
         container.settings.activeOfflineMapId = id
         if (id > 0) container.settings.mapSource = MapSource.OFFLINE
+    }
+
+    fun updateRiderWeight(kg: Float) {
+        val v = kg.coerceIn(30f, 200f)
+        container.settings.riderWeightKg = v
+        _riderWeightKg.value = v
+    }
+
+    fun updateAutoPauseEnabled(enabled: Boolean) {
+        container.settings.autoPauseEnabled = enabled
+        _autoPauseEnabled.value = enabled
+    }
+
+    fun updateAutoPauseThreshold(kmh: Float) {
+        val v = kmh.coerceIn(0.5f, 5f)
+        container.settings.autoPauseThresholdKmh = v
+        _autoPauseThresholdKmh.value = v
+    }
+
+    fun updateHighContrast(enabled: Boolean) {
+        container.settings.highContrast = enabled
+        _highContrast.value = enabled
+    }
+
+    fun updateLocalOnly(enabled: Boolean) {
+        container.settings.localOnlyMode = enabled
+        _localOnly.value = enabled
+    }
+
+    /** 清空本机全部骑行记录与轨迹点。 */
+    fun clearAllRides() {
+        viewModelScope.launch {
+            container.rideRepository.clearAll()
+        }
     }
 }
