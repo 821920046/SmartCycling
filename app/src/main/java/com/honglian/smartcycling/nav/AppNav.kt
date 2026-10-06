@@ -105,6 +105,9 @@ fun AppNav(
     val highContrast by settingsViewModel.highContrast.collectAsState()
     // 首次引导(未展示过则弹出一次)
     var showOnboarding by rememberSaveable { mutableStateOf(!container.settings.onboardingShown) }
+    // 断点续记:上次骑行未正常收尾时,启动后提示用户继续 / 保存 / 丢弃。
+    val recoverable by rideViewModel.recoverableRide.collectAsState()
+    androidx.compose.runtime.LaunchedEffect(Unit) { rideViewModel.checkRecoverableRide() }
 
     NavHost(
         navController = navController,
@@ -289,7 +292,19 @@ fun AppNav(
         }
     }
 
-    if (showOnboarding) {
+    // 恢复弹窗优先于首次引导:骑到一半崩溃的记录比"看引导"更急。
+    if (recoverable != null) {
+        RideRecoveryDialog(
+            ride = recoverable!!,
+            onResume = {
+                rideViewModel.resumeRecoverableRide()
+                onEnterRide()
+                navController.navigate(Routes.RIDE)
+            },
+            onFinalize = { rideViewModel.finalizeRecoverableRide() },
+            onDiscard = { rideViewModel.discardRecoverableRide() },
+        )
+    } else if (showOnboarding) {
         OnboardingDialog(onDismiss = {
             container.settings.onboardingShown = true
             showOnboarding = false

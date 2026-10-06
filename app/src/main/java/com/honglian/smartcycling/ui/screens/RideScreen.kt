@@ -19,12 +19,14 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.amap.api.maps.model.LatLng
+import com.honglian.smartcycling.R
 import com.honglian.smartcycling.ride.RideState
 import com.honglian.smartcycling.ride.SensorMode
 import com.honglian.smartcycling.ride.SpeedSource
@@ -34,6 +36,7 @@ import com.honglian.smartcycling.ui.components.NaviVoiceGuide
 import com.honglian.smartcycling.ui.components.NavigationMapView
 import com.honglian.smartcycling.ui.components.SpeedRing
 import com.honglian.smartcycling.core.MapSource
+import com.honglian.smartcycling.core.Units
 import com.honglian.smartcycling.offline.OfflineLayerSpec
 import com.honglian.smartcycling.offline.OfflineMapView
 import com.honglian.smartcycling.offline.toWgs84
@@ -92,6 +95,7 @@ fun RideScreen(
 
     val configuration = LocalConfiguration.current
     val isPortrait = configuration.orientation == Configuration.ORIENTATION_PORTRAIT
+    val units = AppTheme.units
     if (isPortrait) {
         // ===== 竖屏：全屏地图 + 可缩放悬浮仪表盘 =====
         // 地图始终铺满全屏；仪表盘只是一层 HUD，不再占据底部布局高度或制造黑色空白。
@@ -112,6 +116,7 @@ fun RideScreen(
                     currentLatLng = currentLatLng,
                     routePoints = liveRoute,
                     enabled = voiceEnabled,
+                    units = units,
                     onNaviInfo = { naviInfo = it },
                     onRoutePath = { path -> if (path.isNotEmpty()) liveRoute = path },
                 )
@@ -188,6 +193,7 @@ fun RideScreen(
                     currentLatLng = currentLatLng,
                     routePoints = liveRoute,
                     enabled = voiceEnabled,
+                    units = units,
                     onNaviInfo = { naviInfo = it },
                     onRoutePath = { path -> if (path.isNotEmpty()) liveRoute = path },
                 )
@@ -251,15 +257,16 @@ fun RideScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
-                    "✥ 悬浮仪表 · 拖动 · 双指缩放 · 双击复位",
+                    stringResource(R.string.ride_hud_hint),
                     fontSize = 10.sp,
                     color = DataLabel,
                     fontWeight = FontWeight.Medium,
                 )
                 SpeedRing(
-                    value = if (cadenceMode) state.cadenceRpm else state.speedKmh,
-                    unit = if (cadenceMode) "rpm" else "km/h",
-                    maxValue = if (cadenceMode) 120.0 else 60.0,
+                    value = if (cadenceMode) state.cadenceRpm else Units.speedValue(state.speedKmh, units),
+                    unit = if (cadenceMode) "rpm" else Units.speedUnit(units),
+                    // 满量程也要跟着换算,否则切到英制后指针永远打不满(60 km/h = 37 mph)。
+                    maxValue = if (cadenceMode) 120.0 else Units.speedValue(60.0, units),
                     diameterDp = 150,
                 )
                 Text(
@@ -268,6 +275,19 @@ fun RideScreen(
                     color = if (state.isPaused) PauseOrange else DataLabel,
                     fontWeight = FontWeight.Bold,
                 )
+                // 自动分圈开启时,在速度来源下方补一行当前圈进度。
+                if (state.autoLapEnabled) {
+                    Text(
+                        stringResource(
+                            R.string.ride_hud_lap,
+                            state.currentLap,
+                            Units.distanceText(state.lapDistanceKm, units),
+                        ),
+                        fontSize = 11.sp,
+                        color = BrandCyan,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
                 Card(
                     modifier = Modifier.fillMaxWidth().border(1.dp, GlassBorder, RoundedCornerShape(14.dp)),
                     shape = RoundedCornerShape(14.dp),
@@ -288,14 +308,14 @@ fun RideScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 ControlButton(
-                    text = if (state.isPaused) "▶ 恢复" else "⏸ 暂停",
+                    text = stringResource(if (state.isPaused) R.string.ride_resume else R.string.ride_pause),
                     bg = if (state.isPaused) BrandCyan else PauseOrange,
                     fg = Color(0xFF060913),
                     hPadding = 18.dp,
                     onClick = { if (!locked) onTogglePause() },
                 )
                 ControlButton(
-                    text = "■ 结束骑行",
+                    text = stringResource(R.string.ride_stop),
                     bg = StopRed,
                     fg = Color.White,
                     hPadding = 24.dp,
@@ -321,7 +341,7 @@ fun RideScreen(
                     .padding(horizontal = 18.dp, vertical = 14.dp),
             ) {
                 Text(
-                    if (locked) "🔒 已锁定 · 长按解锁" else "🔓 锁屏",
+                    stringResource(if (locked) R.string.ride_locked else R.string.ride_lock),
                     fontSize = 14.sp,
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
@@ -346,16 +366,16 @@ fun RideScreen(
             containerColor = CardBg,
             titleContentColor = SpeedText,
             textContentColor = DataLabel,
-            title = { Text("确认结束本次骑行？", fontWeight = FontWeight.Bold) },
-            text = { Text("本次骑行的轨迹与传感器数据将被存入本地数据库并同步至云端中控。") },
+            title = { Text(stringResource(R.string.ride_stop_confirm_title), fontWeight = FontWeight.Bold) },
+            text = { Text(stringResource(R.string.ride_stop_confirm_text)) },
             confirmButton = {
                 TextButton(onClick = { showStopConfirm = false; onStop() }) {
-                    Text("确认结束", color = StopRed, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.ride_confirm_stop), color = StopRed, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showStopConfirm = false }) {
-                    Text("继续骑行", color = BrandCyan)
+                    Text(stringResource(R.string.ride_continue), color = BrandCyan)
                 }
             },
         )
@@ -375,6 +395,7 @@ private fun PortraitDashboard(
     modifier: Modifier = Modifier,
 ) {
     val cadenceMode = state.sensorMode == SensorMode.CADENCE
+    val units = AppTheme.units
     val compact = LocalConfiguration.current.screenHeightDp < 760
     val ringSize = if (compact) 92 else 108
     val cardHeight = if (compact) 48.dp else 54.dp
@@ -392,11 +413,27 @@ private fun PortraitDashboard(
     ) {
         // 关键：使用内容高度，不再 fillMaxSize 占满父级，杜绝底部黑色空白。
         Column(Modifier.fillMaxWidth().wrapContentHeight()) {
-            Box(
-                Modifier.align(Alignment.CenterHorizontally).padding(top = 7.dp)
-                    .width(38.dp).height(4.dp)
-                    .background(Color(0x33FFFFFF), RoundedCornerShape(3.dp)),
-            )
+            // 顶部一行:左侧显示当前分圈进度(仅开启分圈时),中间是拖动把手。
+            Box(Modifier.fillMaxWidth().padding(top = 7.dp, start = sidePadding, end = sidePadding)) {
+                if (state.autoLapEnabled) {
+                    Text(
+                        stringResource(
+                            R.string.ride_hud_lap,
+                            state.currentLap,
+                            Units.distanceText(state.lapDistanceKm, units),
+                        ),
+                        fontSize = 11.sp,
+                        color = BrandCyan,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.align(Alignment.CenterStart),
+                    )
+                }
+                Box(
+                    Modifier.align(Alignment.Center)
+                        .width(38.dp).height(4.dp)
+                        .background(Color(0x33FFFFFF), RoundedCornerShape(3.dp)),
+                )
+            }
             // 这里不再使用会把内容滚到按钮下方的滚动容器；所有核心数据在一屏内自适应缩放。
             Column(
                 Modifier.fillMaxWidth().padding(horizontal = sidePadding, vertical = 7.dp),
@@ -408,20 +445,30 @@ private fun PortraitDashboard(
                     horizontalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 14.dp),
                 ) {
                     SpeedRing(
-                        value = if (cadenceMode) state.cadenceRpm else state.speedKmh,
-                        unit = if (cadenceMode) "rpm" else "km/h",
-                        maxValue = if (cadenceMode) 120.0 else 60.0,
+                        value = if (cadenceMode) state.cadenceRpm else Units.speedValue(state.speedKmh, units),
+                        unit = if (cadenceMode) "rpm" else Units.speedUnit(units),
+                        maxValue = if (cadenceMode) 120.0 else Units.speedValue(60.0, units),
                         diameterDp = ringSize,
                     )
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(if (compact) 4.dp else 7.dp)) {
                         StatusPill(text = speedSourceLabel(state, cadenceMode), paused = state.isPaused)
-                        CompactHeroStat("⏱", "骑行时长", state.durationText, BrandCyan, compact)
-                        CompactHeroStat("🏁", "骑行路程", "%.2f km".format(state.distanceKm), BrandGreen, compact)
+                        CompactHeroStat("⏱", stringResource(R.string.ride_stat_duration), state.durationText, BrandCyan, compact)
+                        CompactHeroStat("🏁", stringResource(R.string.ride_stat_distance), Units.distanceText(state.distanceKm, units), BrandGreen, compact)
                     }
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(gap)) {
-                    AdaptiveStatChip(Modifier.weight(1f), "均速", "%.1f".format(state.avgSpeedKmh), "km/h", BrandCyan, highContrast, cardHeight, compact)
-                    AdaptiveStatChip(Modifier.weight(1f), if (cadenceMode) "平均踏频" else "踏频", if (cadenceMode) "${state.avgCadenceRpm.roundToInt()}" else "0", "rpm", BrandGreen, highContrast, cardHeight, compact)
+                    AdaptiveStatChip(
+                        Modifier.weight(1f),
+                        stringResource(R.string.ride_stat_avg_speed),
+                        "%.1f".format(Units.speedValue(state.avgSpeedKmh, units)),
+                        Units.speedUnit(units), BrandCyan, highContrast, cardHeight, compact,
+                    )
+                    AdaptiveStatChip(
+                        Modifier.weight(1f),
+                        stringResource(if (cadenceMode) R.string.ride_stat_avg_cadence else R.string.ride_stat_cadence),
+                        if (cadenceMode) "${state.avgCadenceRpm.roundToInt()}" else "0",
+                        "rpm", BrandGreen, highContrast, cardHeight, compact,
+                    )
                 }
             }
             // 固定操作栏在安全区内：不参与滚动、不被手势条或统计卡片覆盖。
@@ -439,10 +486,10 @@ private fun PortraitDashboard(
                     contentAlignment = Alignment.Center,
                 ) { Text(if (locked) "🔒" else "🔓", fontSize = if (compact) 17.sp else 19.sp) }
                 Surface(onClick = onTogglePause, shape = RoundedCornerShape(14.dp), color = if (state.isPaused) BrandCyan else PauseOrange, contentColor = Color(0xFF060913), modifier = Modifier.weight(1f).height(buttonHeight)) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(if (state.isPaused) "▶ 恢复" else "⏸ 暂停", fontSize = if (compact) 14.sp else 15.sp, fontWeight = FontWeight.Bold) }
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(stringResource(if (state.isPaused) R.string.ride_resume else R.string.ride_pause), fontSize = if (compact) 14.sp else 15.sp, fontWeight = FontWeight.Bold) }
                 }
                 Surface(onClick = onStopRequest, shape = RoundedCornerShape(14.dp), color = StopRed, contentColor = Color.White, modifier = Modifier.weight(1f).height(buttonHeight)) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("■ 结束", fontSize = if (compact) 14.sp else 15.sp, fontWeight = FontWeight.Bold) }
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(stringResource(R.string.ride_stop_short), fontSize = if (compact) 14.sp else 15.sp, fontWeight = FontWeight.Bold) }
                 }
             }
         }
@@ -545,7 +592,7 @@ private fun VoiceToggleButton(
         modifier = modifier,
     ) {
         Text(
-            if (voiceEnabled) "🔊 语音开" else "🔇 语音关",
+            stringResource(if (voiceEnabled) R.string.ride_voice_on else R.string.ride_voice_off),
             fontSize = 14.sp,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
         )
@@ -555,6 +602,9 @@ private fun VoiceToggleButton(
 /** 顶部 turn-by-turn 转向卡：转向图标 + 路名 + 当前段剩余 + 全程剩余/ETA。 */
 @Composable
 private fun TurnBanner(info: NaviBannerInfo, modifier: Modifier = Modifier) {
+    // ifBlank 的 lambda 不是组合上下文,需在此提前取好回退文案。
+    val alongCurrentRoad = stringResource(R.string.ride_banner_along)
+    val units = AppTheme.units
     Surface(
         shape = RoundedCornerShape(18.dp),
         color = Color(0xF20B1622),
@@ -569,22 +619,22 @@ private fun TurnBanner(info: NaviBannerInfo, modifier: Modifier = Modifier) {
             Text(turnIcon(info.iconType), fontSize = 30.sp, color = BrandCyan)
             Column(Modifier.weight(1f)) {
                 Text(
-                    fmtDistance(info.segRemainMeters) + " 后",
+                    stringResource(R.string.ride_banner_after, Units.shortDistanceText(info.segRemainMeters.toDouble(), units)),
                     fontSize = 13.sp,
                     color = DataLabel,
                     fontWeight = FontWeight.Medium,
                 )
                 Text(
-                    info.nextRoad.ifBlank { "沿当前道路" },
+                    info.nextRoad.ifBlank { alongCurrentRoad },
                     fontSize = 17.sp,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                 )
             }
             Column(horizontalAlignment = Alignment.End) {
-                Text("剩余", fontSize = 11.sp, color = DataLabel)
+                Text(stringResource(R.string.ride_banner_remaining), fontSize = 11.sp, color = DataLabel)
                 Text(
-                    fmtDistance(info.routeRemainMeters) + " · " + fmtDuration(info.routeRemainSeconds),
+                    Units.shortDistanceText(info.routeRemainMeters.toDouble(), units) + " · " + fmtDuration(info.routeRemainSeconds),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                     color = BrandCyan,
@@ -620,11 +670,12 @@ private fun ControlButton(
 }
 
 /** 速度来源/状态文字。 */
+@Composable
 private fun speedSourceLabel(state: RideState, cadenceMode: Boolean): String = when {
-    state.isPaused -> "⏱ 自动暂停中"
-    cadenceMode -> "踏频 · 实时 rpm"
-    state.speedSource == SpeedSource.SENSOR_WHEEL -> "速度来源 · 传感器"
-    else -> "速度来源 · GPS"
+    state.isPaused -> stringResource(R.string.ride_status_auto_paused)
+    cadenceMode -> stringResource(R.string.ride_status_cadence)
+    state.speedSource == SpeedSource.SENSOR_WHEEL -> stringResource(R.string.ride_status_sensor)
+    else -> stringResource(R.string.ride_status_gps)
 }
 
 /** 将高德转向 iconType 映射为简单方向箭头（仅视觉提示，未知类型回退直行）。 */
@@ -639,14 +690,15 @@ private fun turnIcon(type: Int): String = when (type) {
     else -> "↑"
 }
 
-/** 距离格式化：≥1km 显示 km，否则 m。 */
-private fun fmtDistance(meters: Int): String =
-    if (meters >= 1000) "%.1f km".format(meters / 1000.0) else "$meters m"
-
 /** 时长格式化：≥60 分显示小时+分，否则分。 */
+@Composable
 private fun fmtDuration(seconds: Int): String {
     val m = seconds / 60
-    return if (m >= 60) "%d小时%d分".format(m / 60, m % 60) else "$m 分"
+    return if (m >= 60) {
+        stringResource(R.string.ride_duration_hm, m / 60, m % 60)
+    } else {
+        stringResource(R.string.ride_duration_min, m)
+    }
 }
 
 /**

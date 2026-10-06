@@ -320,3 +320,195 @@ XML 外部实体注入(XXE)可让恶意 GPX 读取设备本地文件并把内容
 - 云同步(`CloudSyncRepository`)载荷**未包含**新增的心率/海拔字段,
   即云端目前仍只存 lat/lon/speed/时间戳。如需同步,要一并修改 `cloudflare/` 的
   worker 与表结构 —— 本轮未做,以免在未知表结构下擅自改动。
+
+## 六、第五轮对抗审查:P0 缺陷修复 + 文案资源化
+
+本轮范围来自"免费个人骑行软件还能怎么升级"的缺口分析,只做 **P0(缺陷级)**,不做新功能。
+
+### D16 —(能耗缺陷,真实存在)`FLAG_KEEP_SCREEN_ON` 被全局无条件设置
+
+- **现象**:`MainActivity.onCreate` 里直接 `window.addFlags(FLAG_KEEP_SCREEN_ON)`,
+  与骑行状态无关。用户在"骑行历史 / 设置 / 离线地图"等页面停留时,屏幕同样永不熄灭。
+- **根因**:常亮的收益只存在于骑行页(需要随时瞥一眼仪表盘),被写成了全局策略。
+- **修复**:移除全局设置;改为在 `onEnterRide` 里**按用户设置**开启、
+  在 `onExitRide` 里 `clearFlags` 清除。新增设置项 `keepScreenOnWhileRiding`(默认开)。
+- **顺带**:新增 `lockOrientationWhileRiding`(默认关)。开启后进入骑行
+  `SCREEN_ORIENTATION_LOCKED`(锁定进入瞬间方向),退出恢复 `SENSOR` ——
+  解决"手机固定在车把支架上、颠簸导致横竖屏来回切换"的可用性问题。
+
+### D17 —(可维护性 / 无障碍)全部 UI 文案硬编码在 Kotlin 源码里
+
+- **现象**:`strings.xml` 只有 4 条(应用名 + 通知文案),而 UI 层散落 **193 处**中文
+  字符串字面量,分布在 11 个文件;`Text("...")`、`contentDescription`、
+  语音播报文本、`AlertDialog` 文案全都在代码里。
+- **根因**:缺少资源化约定。后果是:改文案要翻代码、无法做多语言、
+  TalkBack 读屏拿不到可本地化文本。
+- **修复**:把 UI 层(Compose)文案**全部**抽到 `strings.xml`(共 194 条资源),
+  统一用 `stringResource()`;非组合上下文(语音 TTS、Marker title、
+  `ifBlank{}` 回退、`onClick` 内的分享文案)改用 `context.getString()` 或提前在组合期取值。
+  带变量的文案一律用位置占位符(`%1$d` / `%1$.1f` / `%1$s`)。
+- **附带修正**:「关于」页版本号原本手写为 `1.1.0`,与 `build.gradle.kts`
+  的 `1.2.0` 已经不一致 —— 改为读 `BuildConfig.VERSION_NAME`,从此不会漂移。
+
+### 6.1 本轮验证手段(针对"大规模机械改写"的风险)
+
+机械改写的风险是**资源名拼错 / 漏 import / 在非组合上下文调用 `stringResource`**,
+这三类都是硬编译错误。因此本轮补了针对性校验:
+
+1. **资源引用闭合性**:用 XML 解析器读 `strings.xml`(验证合法性 + 资源名唯一),
+   再全量扫描 `.kt` 中所有 `R.string.X` 引用 —— **193 个引用全部命中定义,0 缺失**。
+2. **import 完备性**:凡调用 `stringResource(` 的文件必须 import
+   `androidx.compose.ui.res.stringResource`;凡引用 `R.string.` 且不在
+   `com.honglian.smartcycling` 包内的文件必须 import `R` —— **0 违规**。
+3. **占位符类型核对**:逐个比对 `%d` / `%f` 对应的 Kotlin 字段类型
+   (如 `OfflineMapEntity.minZoom:Int` → `%d`、`RideState.calories:Double` → `%f`、
+   `tileCount:Long` → `%d`、`maxHeartRateBpm:Int` → `%d`),避免
+   `IllegalFormatConversionException` 这类**运行时**崩溃。
+4. **组合上下文核对**:逐处确认 `stringResource` 的调用点都在 `@Composable` 作用域内
+   (为此把 `RideScreen.speedSourceLabel` / `fmtDuration` 改标为 `@Composable`,
+   并把分享文案、`ifBlank` 回退文案、Marker title 提到组合期或改用 `context.getString`)。
+5. **残留扫描**:对 11 个 UI 文件做"非注释行内的中文字符串字面量"扫描 —— **残留 0**。
+6. **括号配平**:逐字符状态机(能正确跳过字符串/字符字面量与注释)全工程复扫 —— **全部配平**。
+
+### 6.2 本轮仍未做(受环境限制)
+
+- **依旧未编译、未运行**。本机无 JDK 17 / Android SDK / gradle-wrapper.jar。
+  上述 6 项静态校验能覆盖"资源引用类"错误,但**不能替代真实编译**;
+  仍需在 Android Studio 或 CI 跑 `./gradlew :app:assembleDebug` 与
+  `./gradlew :app:testDebugUnitTest`。
+- 未在真机验证:骑行页常亮开关的实际生效与退出清除、方向锁定在颠簸场景的表现。
+- **未资源化**的非 UI 文案:各 `enum` 的 `label`(`WheelPreset`、`MapCrs`、
+  `OfflineMapFormat`)以及非 Compose 层的日志/错误消息仍在代码里 ——
+  枚举 label 需要改成持有 `@StringRes` 才能资源化,属于独立重构,本轮未做。
+
+## 七、第六轮对抗审查:P1 单位切换 + 自动分圈 + 断点续记
+
+本轮实现上一轮路线图里的 P1 三项。它们都是**纯本地逻辑、不需要新依赖、改动可控**的功能,
+但共同点是"会写数据、会算数字"——恰恰是最容易悄悄算错却看不出来的地方。
+因此本轮审查的重点从"能否编译"转向"**算得对不对**"。
+
+### D18 —(编译阻断,真实存在)`fmtDistance()` 被删除但仍在调用
+
+- **现象**:`RideScreen.kt` 的 `TurnBanner` 里 `fmtDistance(info.routeRemainMeters)` 仍在调用,
+  而该私有函数已在上一步的单位制改造中被删除。这是**硬编译错误**,整个 module 无法构建。
+- **根因**:删除函数时只检查了"我改过的那些调用点",没有做全工程残留扫描。
+- **修复**:改为 `Units.shortDistanceText(info.routeRemainMeters.toDouble(), units)`,
+  顺带让转向卡的距离也跟随单位制。
+- **教训**:删函数必须配一次 `grep "\bname\s*("` 全工程残留扫描,已纳入本轮校验脚本。
+
+### D19 —(数值缺陷,真实存在)`Laps` 把**毫秒**当**秒**用,均速算小 1000 倍
+
+- **现象**:`LapSplit.durationSec` 直接取 `lapSeconds`,而 `lapSeconds` 累加的是
+  `timestampMs` 之差(毫秒);`avgSpeedKmh = km / (lapSeconds / 3600.0)` 里也把它当秒。
+  结果:一圈骑了 30 秒,分圈却显示 `durationSec = 30000`、均速只有实际值的 1/1000。
+- **根因**:变量名 `lapSeconds` 与实际单位不符,掩盖了单位错误。
+- **修复**:重命名为 `lapMillis` 并在注释里写明单位;结算时一次性折算 ——
+  `durationSec = lapMillis / 1000`、`hours = lapMillis / 3_600_000.0`。
+- **测试覆盖**:`LapsTest` 用 10 s 间隔的轨迹断言"每圈 3 段 = 30 s、均速 ≈ 40.03 km/h",
+  这个断言在旧实现下会得到 30 000 s / 0.04 km/h,必然失败。
+
+### D20 —(数值缺陷,真实存在)跨圈时把海拔基线重置回**整段起点**
+
+- **现象**:`resetLap()` 里 `lastAltitude = lapStartAltitude`,而 `lapStartAltitude` 是
+  **整段第一个点**的海拔。于是新一圈的首个高差被算成"起点 → 圈首"的整段落差。
+  爬升 200 m 的路线,从第 2 圈起每圈都会凭空多记约 200 m。
+- **根因**:把"每圈独立统计"误解为"每圈重置基线"。圈边界点本身就是上一圈的末点,
+  它才是新圈的正确基线;重置回整段起点反而制造了一个跨圈的巨大假高差。
+- **修复**:删掉 `lapStartAltitude`,`resetLap()` 不再触碰 `lastAltitude`。
+- **测试覆盖**:`LapsTest.跨圈不会把整段落差算进新一圈的爬升` 断言每圈爬升恒为 30 m ——
+  旧实现下第 2 圈会得到 60 m。
+
+### D21 —(架构决策)分圈不建表,断点续记用哨兵值
+
+两项都是"看起来该加一张表 / 加一列,其实不该"的决策,已写进 `README.md` 的第一性原理章节:
+
+- **分圈**:边界完全由"轨迹点 + 阈值"决定,是可重算的派生数据。物化成表要额外承担
+  写入时机 / 迁移 / 级联删除三处一致性负担,却换不来任何新信息。只在 `rides` 存
+  `lapDistanceM`(阈值),分圈一律 `Laps.split()` 现算 —— **历史记录因此也能立刻显示分圈**。
+- **断点续记**:用 `endedAt = 0` 当哨兵,而不是新增 `isInProgress` 列。省一次迁移,
+  且"进行中"与"已完成"共用同一张表与同一套级联删除;历史查询只需 `endedAt > 0`。
+
+### D22 —(数据迁移)v4 → v5 的 `NOT NULL DEFAULT 0` 契约
+
+新增 `rides.lapDistanceM` 与 `track_points.heartRateBpm`。两列都必须在迁移里写成
+`ALTER TABLE ... ADD COLUMN ... NOT NULL DEFAULT 0`,**并且**在实体上标注
+`@ColumnInfo(defaultValue = "0")` —— 两者缺一,Room 的迁移后 schema 校验就会抛异常。
+历史记录两列取默认 0,表现为"没有分圈、没有心率",UI 自动降级,不会报错。
+
+### D23 —(一致性缺陷)界面切到英制后,语音播报仍说"公里 / 米"
+
+- **现象**:单位制只改到了 Compose 层。TTS 走 `context.getString(R.string.navi_tts_start,
+  meters / 1000.0)`,而该资源文案硬编码为"…全程约 %1$.1f 公里",转向播报同理是"%1$d 米"。
+  结果:屏幕显示 "7.7 mi",耳朵听到"全程约 12.3 公里"。
+- **根因**:`NaviVoiceGuide` 是**非组合上下文**的独立组件,不读 `CompositionLocal`,
+  因此没有拿到单位制。
+- **修复**:给 `NaviVoiceGuide` 加 `units` 参数(由 `RideScreen` 传入),
+  新增 `spokenDistance()` 把距离格式化成**可朗读**文本。
+- **一个关键细节**:语音**不能**直接用 `Units.shortDistanceText()` —— 它返回 "320 m" / "1.5 km",
+  而中文 TTS 会把 "m" 念成字母 M。因此单位改用语言里的**词**
+  (`unit_word_km` / `unit_word_meter` / `unit_word_mile` / `unit_word_foot`),
+  随 `strings.xml` 本地化。公制下的播报文本与改造前**逐字一致**("120 米" / "12.3 公里"),
+  英制下才切换为"英尺 / 英里"。
+
+### 7.1 本轮验证手段
+
+1. **全工程残留扫描**:对已删除符号(本轮为 `fmtDistance`)做 `\bname\s*\(` 全量扫描 —— **0 残留**。
+   (这正是 D18 的成因,现已成为固定检查项。)
+2. **资源引用闭合性**:`strings.xml` 用 XML 解析器读取(213 条、无重名),
+   全量扫描 `.kt` 的 `R.string.X` 引用 —— **212 个引用全部命中,0 缺失**。
+   唯一"未引用"的 `app_name` 由 `AndroidManifest.xml` 的 `android:label` 使用(非 `.kt` 引用)。
+3. **占位符数量核对(本轮修好了两个校验器自身的坑)**:
+   用**括号深度扫描**取调用的完整实参列表,而不是正则 `[^()]*` ——
+   后者遇到 `spokenDistance(context, a, b)` 这类嵌套实参会**静默跳过整条检查**
+   (假阴性,比假阳性更危险)。同时剔除 **Kotlin 尾随逗号**:本项目风格是每个实参独占一行、
+   末尾留逗号,不剔除会把"1 个实参"数成 2 个(8 处假警报)。
+   修正后:`stringResource` / `getString` 全部匹配 —— **0 错配**。
+4. **占位符类型启发式核对**:针对最危险的一类 —— "String 喂给 `%f`"会在运行期抛
+   `IllegalFormatConversionException`。建立"返回 String 的已知函数名"白名单
+   (`Units.*Text` / `formatDuration` / `formatSize` / `spokenDistance` …),
+   与 `%n$d/%n$f` 的实参交叉比对 —— **无疑似错配**。
+   首轮曾报出 1 处误报(`formatSize(entity.sizeBytes)` 因函数名含 `size` 被误判为数值),
+   已通过把 `formatSize(` 加入白名单消除。
+5. **括号配平**:逐字符状态机(正确跳过字符串 / 字符字面量 / 行注释 / 块注释 / 三引号字符串),
+   主源码 63 个 + 测试 7 个文件 —— **全部配平**。
+6. **UI 层中文硬编码残留扫描**:18 个 UI/Nav/MainActivity 文件,剥离注释后扫描
+   字符串字面量中的 CJK —— **残留 0**。
+7. **关键符号 import 完整性**:对 9 个改动文件逐一确认新增符号
+   (`Units` / `UnitSystem` / `Laps` / `LapSplit` / `Context` / `horizontalScroll` /
+   `rememberScrollState` / `HorizontalDivider` / `Icons.Outlined.Flag`)的 import 或通配符覆盖
+   —— **全部就位**。
+8. **主题 token 核对**:确认新代码引用的 `BrandGreen` / `StopRed` / `DataValue` /
+   `PanelBgTop` / `GlassBg` / `DividerNavy` / `CardBg` / `SpeedText` / `DataLabel` / `BrandCyan`
+   均在 `ui/theme/HudColors.kt` 有定义。
+9. **算法独立复现(本轮最强的一环)**:在无 JDK 的前提下,用 Python **逐行等价重写**
+   `Laps.split()` 与 `Units` 换算(注意照抄 Java 的 `Math.toRadians` 实现
+   `angdeg / 180.0 * PI`,与 `angdeg * (PI/180)` 末位可能不同),
+   再跑一遍 `LapsTest` / `UnitsTest` 的全部期望值 —— **12 组断言全部成立**。
+   更关键的是,同一脚本里**刻意复现了 D20 的旧实现**,得到各圈爬升 `[30, 60, 90, 100]`
+   而非正确的 `[30, 30, 30, 10]` —— 这证明该回归测试确实能捕获缺陷,而不是"写了个恒真断言"。
+10. **浮点边界规避**:`LapsTest` 刻意不踩"恰好等于阈值"的浮点相等边界
+    (用"2 段再少 1 米"代替"恰好 2 段"),避免测试本身成为不稳定源。
+
+### 7.2 本轮仍未做(受环境限制)
+
+- **依旧未编译、未运行**。本机无 JDK 17 / Android SDK / gradle-wrapper.jar。
+  D18 再次说明"人工检查"会漏 —— 上述 8 项静态校验能覆盖资源引用 / 括号 / 残留 / 符号类错误,
+  但**不能替代真实编译**。仍需在 Android Studio 或 CI 跑:
+  - `./gradlew :app:assembleDebug`
+  - `./gradlew :app:testDebugUnitTest`(应执行 `LapsTest` 11 例、`UnitsTest` 9 例,
+    以及既有的 `GeoTransformTest` / `TileMathTest` / `CscCalculatorTest` / `HrParserTest` / `GpxFormatTest`)
+- 未在真机验证:自动分圈在真实 GPS 采样率下的圈长误差、断点续记在"杀进程"场景下的恢复完整度、
+  Room v4→v5 迁移、英制下各页面排版是否会因数值变长而换行。
+- 云同步(`CloudSyncRepository`)载荷仍**未包含** `lapDistanceM` 与逐点心率,
+  云端目前只存 lat/lon/speed/时间戳 —— 与上一轮同一处遗留,未做以免在未知表结构下擅自改动。
+- **接入新语言时需补译**语音单位词(`unit_word_km/meter/mile/foot`)。
+  本轮只保证中文下的播报自然;英制 + 非中文 TTS 的组合尚未实测。
+- **既有死代码**:`RideScreen.kt` 的 `HeroStat` / `StatChip` 两个私有 Composable
+  已无任何引用(仅产生"未使用"警告,不影响构建),可择机清理。
+- **仍待资源化**的非 UI 文案:`WheelPreset` / `MapCrs` / `OfflineMapFormat` 等枚举的 `label`
+  (需改为持有 `@StringRes`,属独立重构),与上一轮一致。
+- 本轮用于静态校验与算法独立复现的脚本存放在 `.workbuddy-ai/checks/`(该目录已在
+  `.gitignore` 中),可在无 JDK 环境下重复运行:
+  - `static_check.py` —— 资源闭合 / 占位符数量与类型 / 括号配平 / 中文残留 / import 完整性
+  - `laps_simulation.py` —— `Laps.split()` 与 `Units` 换算的独立复现(含 D20 旧实现对照)
+

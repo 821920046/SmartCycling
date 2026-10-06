@@ -30,6 +30,20 @@ data class RideState(
     val sensorFresh: Boolean = false,
     val isRiding: Boolean = false,
     val isPaused: Boolean = false,
+    /** 本次骑行是否开启自动分圈。 */
+    val autoLapEnabled: Boolean = false,
+    /** 分圈距离(米);0 表示未开启分圈。 */
+    val lapDistanceM: Double = 0.0,
+    /** 当前圈号(从 1 开始);未开启分圈时为 0。 */
+    val currentLap: Int = 0,
+    /** 当前这一圈已骑行的距离(km)。 */
+    val lapDistanceKm: Double = 0.0,
+    /**
+     * 分圈明细(含尚未骑满的尾圈)。
+     *
+     * 由轨迹点现算(见 [Laps.split]),因此骑行中与结束后落库的结果完全一致。
+     */
+    val laps: List<LapSplit> = emptyList(),
 ) {
     val durationText: String
         get() = "%02d:%02d:%02d".format(durationSec / 3600, (durationSec % 3600) / 60, durationSec % 60)

@@ -23,9 +23,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.honglian.smartcycling.R
+import com.honglian.smartcycling.core.Units
 import com.honglian.smartcycling.ride.RideState
 import com.honglian.smartcycling.ride.SensorMode
 import com.honglian.smartcycling.ui.theme.AppTheme
@@ -40,6 +43,7 @@ import kotlin.math.roundToInt
 fun DataGrid(state: RideState, modifier: Modifier = Modifier) {
     val cadenceMode = state.sensorMode == SensorMode.CADENCE
     val dim = if (state.isPaused) 0.45f else 1f
+    val units = AppTheme.units
 
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -47,14 +51,14 @@ fun DataGrid(state: RideState, modifier: Modifier = Modifier) {
                 modifier = Modifier.weight(1f),
                 icon = Icons.Outlined.Timer,
                 value = state.durationText,
-                label = "骑行时长",
+                label = stringResource(R.string.ride_stat_duration),
                 alpha = dim,
             )
             MetricTile(
                 modifier = Modifier.weight(1f),
                 icon = Icons.Outlined.Place,
-                value = "%.2f km".format(state.distanceKm),
-                label = "骑行路程",
+                value = Units.distanceText(state.distanceKm, units),
+                label = stringResource(R.string.ride_stat_distance),
                 alpha = dim,
             )
         }
@@ -62,8 +66,8 @@ fun DataGrid(state: RideState, modifier: Modifier = Modifier) {
             MetricTile(
                 modifier = Modifier.weight(1f),
                 icon = Icons.Outlined.TrendingUp,
-                value = "%.1f km/h".format(state.avgSpeedKmh),
-                label = "平均速度",
+                value = Units.speedText(state.avgSpeedKmh, units),
+                label = stringResource(R.string.summary_avg_speed),
                 alpha = dim,
             )
             if (cadenceMode) {
@@ -71,32 +75,32 @@ fun DataGrid(state: RideState, modifier: Modifier = Modifier) {
                     modifier = Modifier.weight(1f),
                     icon = Icons.Outlined.Autorenew,
                     value = "${state.avgCadenceRpm.roundToInt()} rpm",
-                    label = "平均踏频",
+                    label = stringResource(R.string.ride_stat_avg_cadence),
                     alpha = dim,
                 )
             } else {
                 MetricTile(
                     modifier = Modifier.weight(1f),
                     icon = Icons.Outlined.Speed,
-                    value = "%.1f km/h".format(state.maxSpeedKmh),
-                    label = "最高速度",
+                    value = Units.speedText(state.maxSpeedKmh, units),
+                    label = stringResource(R.string.summary_max_speed),
                     alpha = dim,
                 )
             }
         }
         HorizontalDivider(color = DividerNavy)
         Row(Modifier.fillMaxWidth()) {
-            DataCell(Modifier.weight(1f), "🔥 %.0f kcal".format(state.calories), "消耗热量")
+            DataCell(Modifier.weight(1f), "🔥 %.0f kcal".format(state.calories), stringResource(R.string.summary_calories))
             VerticalDivider(color = DividerNavy)
-            DataCell(Modifier.weight(1f), "⛰ %.0f m".format(state.elevationGainM), "累计爬升")
+            DataCell(Modifier.weight(1f), "⛰ " + Units.elevationText(state.elevationGainM, units), stringResource(R.string.summary_elevation_gain))
         }
         // 心率带为可选外设:未连接时不占用版面,连接后自动展开一行。
         if (state.hasHeartRate) {
             HorizontalDivider(color = DividerNavy)
             Row(Modifier.fillMaxWidth()) {
-                DataCell(Modifier.weight(1f), "❤ %d bpm".format(state.heartRateBpm), "实时心率")
+                DataCell(Modifier.weight(1f), "❤ %d bpm".format(state.heartRateBpm), stringResource(R.string.ride_stat_live_hr))
                 VerticalDivider(color = DividerNavy)
-                DataCell(Modifier.weight(1f), "❤ %.0f bpm".format(state.avgHeartRateBpm), "平均心率")
+                DataCell(Modifier.weight(1f), "❤ %.0f bpm".format(state.avgHeartRateBpm), stringResource(R.string.summary_avg_hr))
             }
         }
     }

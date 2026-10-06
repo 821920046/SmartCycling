@@ -60,6 +60,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -67,7 +68,9 @@ import androidx.compose.ui.unit.sp
 import com.amap.api.maps.AMapUtils
 import com.amap.api.maps.model.LatLng
 import com.amap.api.services.core.PoiItem
+import com.honglian.smartcycling.R
 import com.honglian.smartcycling.core.MapSource
+import com.honglian.smartcycling.core.Units
 import com.honglian.smartcycling.core.WheelPreset
 import com.honglian.smartcycling.offline.OfflineLayerSpec
 import com.honglian.smartcycling.offline.OfflineMapView
@@ -169,7 +172,7 @@ fun MapScreen(
                             query = it
                             onKeywordChanged(it)
                         },
-                        placeholder = { Text("搜索目的地", style = MaterialTheme.typography.body) },
+                        placeholder = { Text(stringResource(R.string.map_search_hint), style = MaterialTheme.typography.body) },
                         singleLine = true,
                         shape = RoundedCornerShape(Radius.md),
                         leadingIcon = {
@@ -197,7 +200,7 @@ fun MapScreen(
                                 modifier = Modifier.size(18.dp),
                             )
                         } else {
-                            Text("规划", style = MaterialTheme.typography.subtitle)
+                            Text(stringResource(R.string.map_plan), style = MaterialTheme.typography.subtitle)
                         }
                     }
                 }
@@ -230,13 +233,13 @@ fun MapScreen(
                     horizontalArrangement = Arrangement.spacedBy(Space.sm),
                 ) {
                     EngineChip(
-                        label = "在线",
+                        label = stringResource(R.string.map_source_online),
                         icon = Icons.Outlined.Public,
                         selected = mapSource == MapSource.ONLINE,
                         onClick = { onSwitchSource(MapSource.ONLINE) },
                     )
                     EngineChip(
-                        label = "离线",
+                        label = stringResource(R.string.map_source_offline),
                         icon = Icons.Outlined.CloudOff,
                         selected = mapSource == MapSource.OFFLINE,
                         enabled = offlineSpec != null,
@@ -283,9 +286,9 @@ fun MapScreen(
                 .padding(end = Space.md),
             verticalArrangement = Arrangement.spacedBy(Space.sm),
         ) {
-            FloatingAction(Icons.Outlined.History, "骑行历史", onNavigateToHistory)
-            FloatingAction(Icons.Outlined.Map, "离线地图", onNavigateToOfflineMaps)
-            FloatingAction(Icons.Outlined.Settings, "设置", onNavigateToSettings)
+            FloatingAction(Icons.Outlined.History, stringResource(R.string.map_nav_history), onNavigateToHistory)
+            FloatingAction(Icons.Outlined.Map, stringResource(R.string.map_nav_offline_maps), onNavigateToOfflineMaps)
+            FloatingAction(Icons.Outlined.Settings, stringResource(R.string.settings_title), onNavigateToSettings)
         }
 
         // 4) 底部开始骑行
@@ -305,7 +308,7 @@ fun MapScreen(
                     modifier = Modifier.padding(bottom = Space.sm),
                 ) {
                     Text(
-                        "预计骑行 %.1f km".format(distanceKm),
+                        stringResource(R.string.map_estimated_distance, Units.distanceText(distanceKm, AppTheme.units, decimals = 1)),
                         style = MaterialTheme.typography.label,
                         color = palette.textPrimary,
                         modifier = Modifier.padding(horizontal = Space.lg, vertical = Space.sm),
@@ -321,7 +324,7 @@ fun MapScreen(
             ) {
                 Icon(Icons.Outlined.DirectionsBike, contentDescription = null, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(Space.sm))
-                Text("开始骑行", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.onboarding_start), fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
             }
         }
     }
@@ -361,7 +364,7 @@ private fun SuggestionRow(poi: PoiItem, onClick: () -> Unit) {
         Spacer(Modifier.width(Space.sm))
         Column(Modifier.weight(1f)) {
             Text(
-                text = poi.title?.takeIf { it.isNotBlank() } ?: "未知地点",
+                text = poi.title?.takeIf { it.isNotBlank() } ?: stringResource(R.string.map_unknown_place),
                 style = MaterialTheme.typography.body,
                 color = palette.textPrimary,
                 maxLines = 1,
@@ -470,12 +473,12 @@ private fun WheelDialog(
         containerColor = palette.surface,
         titleContentColor = palette.textPrimary,
         textContentColor = palette.textSecondary,
-        confirmButton = { TextButton(onClick = onDismiss) { Text("完成", color = palette.primary) } },
-        title = { Text("车轮周长标定", style = MaterialTheme.typography.title) },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_done), color = palette.primary) } },
+        title = { Text(stringResource(R.string.settings_wheel_dialog_title), style = MaterialTheme.typography.title) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 Text(
-                    "用于无 GPS 时按轮转圈数回退计算速度与里程。",
+                    stringResource(R.string.map_wheel_dialog_desc),
                     style = MaterialTheme.typography.caption,
                     modifier = Modifier.padding(bottom = Space.sm),
                 )
@@ -492,7 +495,7 @@ private fun WheelDialog(
                         Column {
                             Text(p.label, style = MaterialTheme.typography.body, color = palette.textPrimary)
                             Text(
-                                "周长 ${p.circumferenceMm} mm",
+                                stringResource(R.string.map_wheel_circumference, p.circumferenceMm),
                                 style = MaterialTheme.typography.caption,
                                 color = palette.textTertiary,
                             )
@@ -508,15 +511,19 @@ private fun WheelDialog(
 @Composable
 private fun LayerDialog(current: Int, onSelect: (Int) -> Unit, onDismiss: () -> Unit) {
     val palette = AppTheme.palette
-    val options = listOf(1 to "标准", 2 to "卫星", 3 to "夜间")
+    val options = listOf(
+        1 to stringResource(R.string.map_layer_standard),
+        2 to stringResource(R.string.map_layer_satellite),
+        3 to stringResource(R.string.map_layer_night),
+    )
     AlertDialog(
         onDismissRequest = onDismiss,
         shape = RoundedCornerShape(Radius.lg),
         containerColor = palette.surface,
         titleContentColor = palette.textPrimary,
         textContentColor = palette.textSecondary,
-        confirmButton = { TextButton(onClick = onDismiss) { Text("关闭", color = palette.primary) } },
-        title = { Text("地图图层", style = MaterialTheme.typography.title) },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close), color = palette.primary) } },
+        title = { Text(stringResource(R.string.map_layer_dialog_title), style = MaterialTheme.typography.title) },
         text = {
             Column {
                 options.forEach { (type, label) ->
@@ -533,7 +540,7 @@ private fun LayerDialog(current: Int, onSelect: (Int) -> Unit, onDismiss: () -> 
                     }
                 }
                 Text(
-                    "图层切换在「在线」引擎下生效;离线包使用其自带样式。",
+                    stringResource(R.string.map_layer_dialog_desc),
                     style = MaterialTheme.typography.caption,
                     color = palette.textTertiary,
                 )

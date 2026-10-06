@@ -6,6 +6,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,6 +23,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowBack
@@ -30,10 +32,12 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DirectionsBike
 import androidx.compose.material.icons.outlined.EmojiEvents
 import androidx.compose.material.icons.outlined.FileDownload
+import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -52,18 +56,24 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
 import com.amap.api.maps.model.LatLng
+import com.honglian.smartcycling.R
 import com.honglian.smartcycling.core.MapSource
+import com.honglian.smartcycling.core.UnitSystem
+import com.honglian.smartcycling.core.Units
 import com.honglian.smartcycling.data.RideEntity
 import com.honglian.smartcycling.data.TrackPointEntity
 import com.honglian.smartcycling.export.RideExporter
 import com.honglian.smartcycling.offline.OfflineLayerSpec
 import com.honglian.smartcycling.offline.OfflineMapView
 import com.honglian.smartcycling.offline.toWgs84
+import com.honglian.smartcycling.ride.LapSplit
+import com.honglian.smartcycling.ride.Laps
 import com.honglian.smartcycling.ui.components.NavigationMapView
 import com.honglian.smartcycling.ui.theme.AppTheme
 import com.honglian.smartcycling.ui.theme.Radius
@@ -88,11 +98,15 @@ fun HistoryScreen(
     modifier: Modifier = Modifier,
 ) {
     val palette = AppTheme.palette
+    val units = AppTheme.units
     val scope = rememberCoroutineScope()
     val fmt = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()) }
 
     var activeRide by remember { mutableStateOf<RideEntity?>(null) }
     var trackPoints by remember { mutableStateOf<List<LatLng>>(emptyList()) }
+    // 原始轨迹点(保留海拔/心率/时间戳),用于在详情里现算分圈 ——
+    // 上面那份 trackPoints 已被降维成 LatLng,不足以推导分圈。
+    var rawPoints by remember { mutableStateOf<List<TrackPointEntity>>(emptyList()) }
     var loading by remember { mutableStateOf(false) }
 
     // —— GPX 导出(SAF,用户自选保存位置) ——
@@ -137,10 +151,10 @@ fun HistoryScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.Outlined.ArrowBack, contentDescription = "返回", tint = palette.textPrimary)
+                    Icon(Icons.Outlined.ArrowBack, contentDescription = stringResource(R.string.action_back), tint = palette.textPrimary)
                 }
                 Text(
-                    "骑行历史",
+                    stringResource(R.string.map_nav_history),
                     style = MaterialTheme.typography.title,
                     color = palette.textPrimary,
                     modifier = Modifier.weight(1f),
@@ -152,7 +166,7 @@ fun HistoryScreen(
                     }) {
                         Icon(
                             Icons.Outlined.FileDownload,
-                            contentDescription = "导出全部 GPX",
+                            contentDescription = stringResource(R.string.history_export_all),
                             tint = palette.textSecondary,
                         )
                     }
@@ -172,9 +186,9 @@ fun HistoryScreen(
                             .padding(vertical = Space.lg),
                         horizontalArrangement = Arrangement.SpaceEvenly,
                     ) {
-                        Stat("累计里程", "%.1f".format(totalDistance), "km")
-                        Stat("骑行次数", "${rides.size}", "次")
-                        Stat("累计时长", "%.1f".format(totalDuration / 3600.0), "h")
+                        Stat(stringResource(R.string.history_total_distance), "%.1f".format(Units.distance(totalDistance, units)), Units.distanceUnit(units))
+                        Stat(stringResource(R.string.history_ride_count), "${rides.size}", stringResource(R.string.history_unit_times))
+                        Stat(stringResource(R.string.history_total_duration), "%.1f".format(totalDuration / 3600.0), "h")
                     }
                 }
 
@@ -196,20 +210,20 @@ fun HistoryScreen(
                                 )
                                 Spacer(Modifier.width(Space.xs))
                                 Text(
-                                    "个人纪录",
+                                    stringResource(R.string.history_personal_records),
                                     style = MaterialTheme.typography.subtitle,
                                     color = palette.textPrimary,
                                 )
                             }
                             Spacer(Modifier.height(Space.sm))
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                                Stat("最远单次", "%.1f".format(prDistance), "km")
-                                Stat("最快均速", "%.1f".format(prSpeed), "km/h")
+                                Stat(stringResource(R.string.history_pr_distance), "%.1f".format(Units.distance(prDistance, units)), Units.distanceUnit(units))
+                                Stat(stringResource(R.string.history_pr_speed), "%.1f".format(Units.speed(prSpeed, units)), Units.speedUnit(units))
                             }
                             Spacer(Modifier.height(Space.sm))
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                                Stat("最长时长", formatDuration(prDuration), "")
-                                Stat("最大爬升", "%.0f".format(prElevation), "m")
+                                Stat(stringResource(R.string.history_pr_duration), formatDuration(prDuration), "")
+                                Stat(stringResource(R.string.history_pr_elevation), "%.0f".format(Units.elevation(prElevation, units)), Units.elevationUnit(units))
                             }
                         }
                     }
@@ -232,7 +246,7 @@ fun HistoryScreen(
                             contentAlignment = Alignment.Center,
                         ) {
                             Text(
-                                "暂无骑行记录,完成一次骑行后会显示在这里。",
+                                stringResource(R.string.history_empty),
                                 style = MaterialTheme.typography.body,
                                 color = palette.textTertiary,
                             )
@@ -247,8 +261,9 @@ fun HistoryScreen(
                             scope.launch {
                                 loading = true
                                 activeRide = ride
-                                trackPoints = onGetTrackPoints(ride.id)
-                                    .map { LatLng(it.latitude, it.longitude) }
+                                val pts = onGetTrackPoints(ride.id)
+                                rawPoints = pts
+                                trackPoints = pts.map { LatLng(it.latitude, it.longitude) }
                                 loading = false
                             }
                         },
@@ -279,10 +294,11 @@ fun HistoryScreen(
                             color = palette.textPrimary,
                         )
                         Text(
-                            "%.2f km · %s · 均速 %.1f km/h".format(
-                                ride.distanceKm,
+                            stringResource(
+                                R.string.history_ride_subtitle,
+                                Units.distanceText(ride.distanceKm, units),
                                 formatDuration(ride.durationSec),
-                                ride.avgSpeedKmh,
+                                Units.speedText(ride.avgSpeedKmh, units),
                             ),
                             style = MaterialTheme.typography.caption,
                             color = palette.textTertiary,
@@ -294,54 +310,66 @@ fun HistoryScreen(
                     }) {
                         Icon(
                             Icons.Outlined.FileDownload,
-                            contentDescription = "导出 GPX",
+                            contentDescription = stringResource(R.string.history_export_gpx),
                             tint = palette.primary,
                         )
                     }
                     IconButton(onClick = { activeRide = null }) {
-                        Icon(Icons.Outlined.Close, contentDescription = "关闭", tint = palette.textSecondary)
+                        Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.action_close), tint = palette.textSecondary)
                     }
                 }
             },
             text = {
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .clip(RoundedCornerShape(Radius.md))
-                        .background(palette.surfaceVariant),
-                ) {
-                    // 轨迹点存的是 GCJ-02(高德定位),离线底图按 WGS-84 网格渲染 →
-                    // 离线分支必须先纠偏,否则历史轨迹会整体偏移 300~600 米。
-                    val wgsTrack = remember(trackPoints) { trackPoints.toWgs84() }
-                    when {
-                        loading -> CircularProgressIndicator(
-                            color = palette.primary,
-                            modifier = Modifier.align(Alignment.Center),
-                        )
-                        mapSource == MapSource.OFFLINE && offlineSpec != null -> OfflineMapView(
-                            spec = offlineSpec,
-                            routePoints = wgsTrack,
-                            destination = wgsTrack.lastOrNull(),
-                            follow = false,
-                            routeColor = palette.primary.toArgb(),
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                        else -> NavigationMapView(
-                            modifier = Modifier.fillMaxSize(),
-                            routePoints = trackPoints,
-                            destination = trackPoints.lastOrNull(),
-                            follow = false,
-                            showMyLocation = false,
-                            mapType = mapType,
-                        )
+                Column(Modifier.fillMaxSize()) {
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(Radius.md))
+                            .background(palette.surfaceVariant),
+                    ) {
+                        // 轨迹点存的是 GCJ-02(高德定位),离线底图按 WGS-84 网格渲染 →
+                        // 离线分支必须先纠偏,否则历史轨迹会整体偏移 300~600 米。
+                        val wgsTrack = remember(trackPoints) { trackPoints.toWgs84() }
+                        when {
+                            loading -> CircularProgressIndicator(
+                                color = palette.primary,
+                                modifier = Modifier.align(Alignment.Center),
+                            )
+                            mapSource == MapSource.OFFLINE && offlineSpec != null -> OfflineMapView(
+                                spec = offlineSpec,
+                                routePoints = wgsTrack,
+                                destination = wgsTrack.lastOrNull(),
+                                follow = false,
+                                routeColor = palette.primary.toArgb(),
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                            else -> NavigationMapView(
+                                modifier = Modifier.fillMaxSize(),
+                                routePoints = trackPoints,
+                                destination = trackPoints.lastOrNull(),
+                                follow = false,
+                                showMyLocation = false,
+                                mapType = mapType,
+                            )
+                        }
+                        if (!loading && trackPoints.isEmpty()) {
+                            Text(
+                                stringResource(R.string.history_no_track),
+                                style = MaterialTheme.typography.body,
+                                color = palette.textTertiary,
+                                modifier = Modifier.align(Alignment.Center),
+                            )
+                        }
                     }
-                    if (!loading && trackPoints.isEmpty()) {
-                        Text(
-                            "该次骑行没有采集到有效轨迹点",
-                            style = MaterialTheme.typography.body,
-                            color = palette.textTertiary,
-                            modifier = Modifier.align(Alignment.Center),
-                        )
+                    // 分圈:用原始轨迹点现算(与骑行中、成绩页同一套算法),
+                    // 因此历史记录无需额外落库也能看到分段数据。
+                    val laps = remember(rawPoints, ride.lapDistanceM) {
+                        if (ride.lapDistanceM > 0.0) Laps.split(rawPoints, ride.lapDistanceM) else emptyList()
+                    }
+                    if (!loading && laps.isNotEmpty()) {
+                        Spacer(Modifier.height(Space.md))
+                        LapStrip(laps = laps, units = units)
                     }
                 }
             },
@@ -370,6 +398,10 @@ private fun RideCard(
     onDelete: () -> Unit,
 ) {
     val palette = AppTheme.palette
+    val units = AppTheme.units
+    // 心率带为可选外设:有心率数据才拼上心率片段。
+    val facts = stringResource(R.string.history_ride_facts, ride.calories, Units.elevationText(ride.elevationGainM, units))
+    val hrSuffix = stringResource(R.string.history_ride_hr_suffix, ride.avgHeartRateBpm)
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(Radius.lg),
@@ -400,7 +432,7 @@ private fun RideCard(
             Spacer(Modifier.width(Space.md))
             Column(Modifier.weight(1f)) {
                 Text(
-                    "%.2f km".format(ride.distanceKm),
+                    Units.distanceText(ride.distanceKm, units),
                     style = MaterialTheme.typography.subtitle,
                     color = palette.textPrimary,
                 )
@@ -408,14 +440,11 @@ private fun RideCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     MiniFact(Icons.Outlined.Timer, formatDuration(ride.durationSec))
                     Spacer(Modifier.width(Space.md))
-                    MiniFact(Icons.Outlined.Place, "均速 %.1f".format(ride.avgSpeedKmh))
+                    MiniFact(Icons.Outlined.Place, stringResource(R.string.history_avg_speed_short, Units.speedText(ride.avgSpeedKmh, units)))
                 }
                 Spacer(Modifier.height(2.dp))
                 Text(
-                    buildString {
-                        append("%.0f kcal · 爬升 %.0f m".format(ride.calories, ride.elevationGainM))
-                        if (ride.avgHeartRateBpm > 0) append(" · ❤ %.0f".format(ride.avgHeartRateBpm))
-                    },
+                    facts + if (ride.avgHeartRateBpm > 0) hrSuffix else "",
                     style = MaterialTheme.typography.caption,
                     color = palette.textSecondary,
                 )
@@ -424,7 +453,7 @@ private fun RideCard(
             IconButton(onClick = onDelete) {
                 Icon(
                     Icons.Outlined.Delete,
-                    contentDescription = "删除",
+                    contentDescription = stringResource(R.string.action_delete),
                     tint = palette.textTertiary,
                     modifier = Modifier.size(19.dp),
                 )
@@ -440,6 +469,70 @@ private fun MiniFact(icon: ImageVector, text: String) {
         Icon(icon, contentDescription = null, tint = palette.textTertiary, modifier = Modifier.size(13.dp))
         Spacer(Modifier.width(4.dp))
         Text(text, style = MaterialTheme.typography.caption, color = palette.textSecondary)
+    }
+}
+
+/** 分圈横向条:每条记录一格,圈数多时可横向滑动。 */
+@Composable
+private fun LapStrip(laps: List<LapSplit>, units: UnitSystem) {
+    val palette = AppTheme.palette
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                Icons.Outlined.Flag,
+                contentDescription = null,
+                tint = palette.primary,
+                modifier = Modifier.size(14.dp),
+            )
+            Spacer(Modifier.width(Space.xs))
+            Text(
+                stringResource(R.string.laps_title),
+                style = MaterialTheme.typography.caption,
+                color = palette.textSecondary,
+            )
+        }
+        Spacer(Modifier.height(Space.xs))
+        Row(
+            Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(Space.sm),
+        ) {
+            laps.forEach { lap -> LapChip(lap, units) }
+        }
+    }
+}
+
+@Composable
+private fun LapChip(lap: LapSplit, units: UnitSystem) {
+    val palette = AppTheme.palette
+    Surface(
+        shape = RoundedCornerShape(Radius.md),
+        color = palette.surface,
+        border = BorderStroke(1.dp, palette.outline),
+    ) {
+        Column(Modifier.padding(horizontal = Space.sm, vertical = Space.xs)) {
+            Text(
+                stringResource(R.string.lap_number, lap.index) +
+                    if (lap.isComplete) "" else " · " + stringResource(R.string.lap_in_progress),
+                style = MaterialTheme.typography.caption,
+                color = if (lap.isComplete) palette.textSecondary else palette.primary,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                Units.distanceText(lap.distanceKm, units),
+                style = MaterialTheme.typography.label,
+                color = palette.textPrimary,
+            )
+            Text(
+                formatDuration(lap.durationSec),
+                style = MaterialTheme.typography.caption,
+                color = palette.textTertiary,
+            )
+            Text(
+                Units.speedText(lap.avgSpeedKmh, units),
+                style = MaterialTheme.typography.caption,
+                color = palette.textSecondary,
+            )
+        }
     }
 }
 

@@ -1,5 +1,6 @@
 package com.honglian.smartcycling.ui.components
 
+import android.content.Context
 import android.location.Location
 import android.media.AudioAttributes
 import android.speech.tts.TextToSpeech
@@ -11,6 +12,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.LocalContext
 import com.amap.api.maps.model.LatLng
+import com.honglian.smartcycling.R
+import com.honglian.smartcycling.core.UnitSystem
+import com.honglian.smartcycling.core.Units
 import kotlinx.coroutines.delay
 import java.util.Locale
 import kotlin.math.abs
@@ -36,6 +40,8 @@ fun NaviVoiceGuide(
     currentLatLng: LatLng?,
     routePoints: List<LatLng> = emptyList(),
     enabled: Boolean,
+    /** 当前单位制:决定播报里说的是"米/公里"还是"英尺/英里"。 */
+    units: UnitSystem = UnitSystem.METRIC,
     onNaviInfo: (NaviBannerInfo?) -> Unit = {},
     onRoutePath: (List<LatLng>) -> Unit = {},
 ) {
@@ -45,6 +51,7 @@ fun NaviVoiceGuide(
     val locState = rememberUpdatedState(currentLatLng)
     val destState = rememberUpdatedState(destination)
     val onNaviInfoState = rememberUpdatedState(onNaviInfo)
+    val unitsState = rememberUpdatedState(units)
 
     val ttsReady = remember { mutableStateOf(false) }
     // 系统 TextToSpeech（中文）。构造与语言设置全部兜底，初始化失败仅静音、不影响导航。
@@ -75,7 +82,7 @@ fun NaviVoiceGuide(
                     // 初始化成功后先播一段短提示，验证引擎与音频通道；主循环随后播报完整路线信息。
                     ttsReady.value = true
                     runCatching {
-                        engine?.speak("骑行导航语音已开启", TextToSpeech.QUEUE_FLUSH, null, "nav_ready")
+                        engine?.speak(context.getString(R.string.navi_tts_ready), TextToSpeech.QUEUE_FLUSH, null, "nav_ready")
                     }
                 }
             }
@@ -114,24 +121,63 @@ fun NaviVoiceGuide(
 
                 // 等 TTS 就绪再播报起步，避免初始化未完成时白白丢掉首播。
                 if (!announcedStart && ttsReady.value) {
-                    speak("开始骑行导航，全程约 %.1f 公里".format(info.routeRemainMeters / 1000.0))
+                    speak(
+                        context.getString(
+                            R.string.navi_tts_start,
+                            spokenDistance(context, info.routeRemainMeters.toDouble(), unitsState.value),
+                        ),
+                    )
                     announcedStart = true
                 }
                 // 转向播报：接近转向点（<120m）时播报一次，转向点远离后重新武装
                 if (info.iconType != 1 && info.segRemainMeters in 1..120 && turnArmed) {
-                    val dir = if (info.iconType == 2) "左转" else "右转"
-                    speak("前方 %d 米%s".format(info.segRemainMeters, dir))
+                    val dir = context.getString(
+                        if (info.iconType == 2) R.string.navi_turn_left else R.string.navi_turn_right,
+                    )
+                    speak(
+                        context.getString(
+                            R.string.navi_tts_turn,
+                            spokenDistance(context, info.segRemainMeters.toDouble(), unitsState.value),
+                            dir,
+                        ),
+                    )
                     turnArmed = false
                 } else if (info.iconType == 1 || info.segRemainMeters > 200) {
                     turnArmed = true
                 }
                 // 到达播报
                 if (!announcedArrive && info.routeRemainMeters <= 50) {
-                    speak("即将到达目的地")
+                    speak(context.getString(R.string.navi_tts_arrive))
                     announcedArrive = true
                 }
             }
             delay(1000)
+        }
+    }
+}
+
+/**
+ * 把距离格式化成**可朗读**的文本。
+ *
+ * 与界面不同,语音播报不能用 "km" / "ft" 这类符号 —— 中文 TTS 会把 "m" 念成字母。
+ * 因此单位一律取语言里的**词**(公里 / 米 / 英里 / 英尺),随 `strings.xml` 本地化。
+ *
+ * 公制下的输出与改造前完全一致("120 米" / "12.3 公里"),英制下才切换到"英尺 / 英里"。
+ */
+private fun spokenDistance(context: Context, meters: Double, unit: UnitSystem): String {
+    val km = meters / 1000.0
+    return if (unit == UnitSystem.IMPERIAL) {
+        val miles = Units.distance(km, UnitSystem.IMPERIAL)
+        if (miles >= 0.2) {
+            "%.1f %s".format(miles, context.getString(R.string.unit_word_mile))
+        } else {
+            "%.0f %s".format(meters / 0.3048, context.getString(R.string.unit_word_foot))
+        }
+    } else {
+        if (meters >= 1000.0) {
+            "%.1f %s".format(km, context.getString(R.string.unit_word_km))
+        } else {
+            "%.0f %s".format(meters, context.getString(R.string.unit_word_meter))
         }
     }
 }

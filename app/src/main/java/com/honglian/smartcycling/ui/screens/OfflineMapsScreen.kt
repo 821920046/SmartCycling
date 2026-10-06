@@ -54,9 +54,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.honglian.smartcycling.R
 import com.honglian.smartcycling.data.OfflineMapEntity
 import com.honglian.smartcycling.offline.MapCrs
 import com.honglian.smartcycling.offline.OfflineMapFormat
@@ -110,10 +112,10 @@ fun OfflineMapsScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.Outlined.ArrowBack, contentDescription = "返回", tint = palette.textPrimary)
+                    Icon(Icons.Outlined.ArrowBack, contentDescription = stringResource(R.string.action_back), tint = palette.textPrimary)
                 }
                 Text(
-                    "离线地图",
+                    stringResource(R.string.map_nav_offline_maps),
                     style = MaterialTheme.typography.title,
                     color = palette.textPrimary,
                     modifier = Modifier.weight(1f),
@@ -137,7 +139,7 @@ fun OfflineMapsScreen(
                     ) {
                         Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(Space.sm))
-                        Text("导入文件", style = MaterialTheme.typography.subtitle)
+                        Text(stringResource(R.string.offline_import_file), style = MaterialTheme.typography.subtitle)
                     }
                     OutlinedButton(
                         onClick = { folderPicker.launch(null) },
@@ -147,7 +149,7 @@ fun OfflineMapsScreen(
                     ) {
                         Icon(Icons.Outlined.CreateNewFolder, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(Space.sm))
-                        Text("导入文件夹", style = MaterialTheme.typography.subtitle)
+                        Text(stringResource(R.string.offline_import_folder), style = MaterialTheme.typography.subtitle)
                     }
                 }
 
@@ -167,7 +169,7 @@ fun OfflineMapsScreen(
                                     modifier = Modifier.weight(1f),
                                 )
                                 TextButton(onClick = viewModel::cancelImport) {
-                                    Text("取消", color = palette.danger, fontWeight = FontWeight.SemiBold)
+                                    Text(stringResource(R.string.action_cancel), color = palette.danger, fontWeight = FontWeight.SemiBold)
                                 }
                             }
                             if (importState.progress > 0f) {
@@ -181,9 +183,9 @@ fun OfflineMapsScreen(
                             Spacer(Modifier.height(Space.xs))
                             Text(
                                 if (importState.progress > 0f) {
-                                    "正在拷贝到应用私有目录 ${(importState.progress * 100).toInt()}%,完成后解析元数据…"
+                                    stringResource(R.string.offline_copying_progress, (importState.progress * 100).toInt())
                                 } else {
-                                    "正在拷贝到应用私有目录并解析元数据,大文件可能需要数十秒…"
+                                    stringResource(R.string.offline_copying)
                                 },
                                 style = MaterialTheme.typography.caption,
                                 color = palette.textTertiary,
@@ -229,7 +231,7 @@ fun OfflineMapsScreen(
                                 modifier = Modifier.weight(1f),
                             )
                             TextButton(onClick = viewModel::dismissMessage) {
-                                Text("知道了", color = palette.primary)
+                                Text(stringResource(R.string.offline_got_it), color = palette.primary)
                             }
                         }
                     }
@@ -245,7 +247,7 @@ fun OfflineMapsScreen(
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
-                            "还没有导入任何离线地图",
+                            stringResource(R.string.offline_empty),
                             style = MaterialTheme.typography.body,
                             color = palette.textTertiary,
                         )
@@ -276,10 +278,10 @@ fun OfflineMapsScreen(
             containerColor = palette.surface,
             titleContentColor = palette.textPrimary,
             textContentColor = palette.textSecondary,
-            title = { Text("删除离线地图?", style = MaterialTheme.typography.title) },
+            title = { Text(stringResource(R.string.offline_delete_title), style = MaterialTheme.typography.title) },
             text = {
                 Text(
-                    "将从设备上永久删除「${entity.name}」及其瓦片文件(${viewModel.formatSize(entity.sizeBytes)})。此操作不可撤销。",
+                    stringResource(R.string.offline_delete_text, entity.name, viewModel.formatSize(entity.sizeBytes)),
                     style = MaterialTheme.typography.body,
                 )
             },
@@ -287,10 +289,10 @@ fun OfflineMapsScreen(
                 TextButton(onClick = {
                     viewModel.delete(entity.id)
                     pendingDelete = null
-                }) { Text("删除", color = palette.danger, fontWeight = FontWeight.SemiBold) }
+                }) { Text(stringResource(R.string.action_delete), color = palette.danger, fontWeight = FontWeight.SemiBold) }
             },
             dismissButton = {
-                TextButton(onClick = { pendingDelete = null }) { Text("取消", color = palette.primary) }
+                TextButton(onClick = { pendingDelete = null }) { Text(stringResource(R.string.action_cancel), color = palette.primary) }
             },
         )
     }
@@ -324,13 +326,13 @@ private fun GuideCard() {
                 Icon(Icons.Outlined.Info, contentDescription = null, tint = palette.primary, modifier = Modifier.size(17.dp))
                 Spacer(Modifier.width(Space.sm))
                 Text(
-                    "支持哪些离线地图?如何获取?",
+                    stringResource(R.string.offline_guide_title),
                     style = MaterialTheme.typography.subtitle,
                     color = palette.textPrimary,
                     modifier = Modifier.weight(1f),
                 )
                 Text(
-                    if (expanded) "收起" else "展开",
+                    stringResource(if (expanded) R.string.offline_collapse else R.string.offline_expand),
                     style = MaterialTheme.typography.caption,
                     color = palette.primary,
                 )
@@ -338,11 +340,11 @@ private fun GuideCard() {
             if (expanded) {
                 Spacer(Modifier.height(Space.sm))
                 val lines = listOf(
-                    "支持格式:MBTiles(.mbtiles)、ZIP 瓦片包、{z}/{x}/{y} 瓦片文件夹、osmdroid SQLite。",
-                    "制作方式:用 SAS.Planet / Mobile Atlas Creator / QGIS 选择任意平台(高德、腾讯、百度、Google、OSM、Mapbox)导出为 MBTiles 或瓦片目录,再导入本页。",
-                    "坐标系:高德 / 腾讯 = GCJ-02;百度 = BD-09;OSM / Google(海外) / Mapbox = WGS-84。导入后请在条目上点「坐标系」核对,选错会导致车标整体偏移数百米。",
-                    "GeoPackage 与 PMTiles 暂不支持直接渲染,请先转换为 MBTiles。",
-                    "瓦片数据请自行确保合法授权;本应用仅做本地渲染,不提供任何地图数据下载。",
+                    stringResource(R.string.offline_guide_line1),
+                    stringResource(R.string.offline_guide_line2),
+                    stringResource(R.string.offline_guide_line3),
+                    stringResource(R.string.offline_guide_line4),
+                    stringResource(R.string.offline_guide_line5),
                 )
                 lines.forEach {
                     Text(
@@ -389,7 +391,7 @@ private fun MapCard(
                     )
                     Spacer(Modifier.height(2.dp))
                     Text(
-                        "${format.label} · z${entity.minZoom}-${entity.maxZoom} · ${entity.tileCount} 张 · $sizeText",
+                        stringResource(R.string.offline_card_meta, format.label, entity.minZoom, entity.maxZoom, entity.tileCount, sizeText),
                         style = MaterialTheme.typography.caption,
                         color = palette.textTertiary,
                     )
@@ -397,7 +399,7 @@ private fun MapCard(
                 IconButton(onClick = onDelete) {
                     Icon(
                         Icons.Outlined.Delete,
-                        contentDescription = "删除",
+                        contentDescription = stringResource(R.string.action_delete),
                         tint = palette.textTertiary,
                         modifier = Modifier.size(19.dp),
                     )
@@ -407,7 +409,7 @@ private fun MapCard(
             if (missing) {
                 Spacer(Modifier.height(Space.xs))
                 Text(
-                    "文件已丢失,请删除后重新导入。",
+                    stringResource(R.string.offline_missing),
                     style = MaterialTheme.typography.caption,
                     color = palette.danger,
                 )
@@ -423,14 +425,14 @@ private fun MapCard(
                 Icon(Icons.Outlined.Map, contentDescription = null, tint = palette.primary, modifier = Modifier.size(15.dp))
                 Spacer(Modifier.width(Space.sm))
                 Column(Modifier.weight(1f)) {
-                    Text("坐标系", style = MaterialTheme.typography.caption, color = palette.textTertiary)
+                    Text(stringResource(R.string.offline_crs), style = MaterialTheme.typography.caption, color = palette.textTertiary)
                     Text(
                         crs.label,
                         style = MaterialTheme.typography.label,
                         color = palette.textPrimary,
                     )
                 }
-                Text("修改", style = MaterialTheme.typography.caption, color = palette.primary)
+                Text(stringResource(R.string.offline_edit), style = MaterialTheme.typography.caption, color = palette.primary)
             }
         }
     }
@@ -450,12 +452,12 @@ private fun CrsDialog(
         containerColor = palette.surface,
         titleContentColor = palette.textPrimary,
         textContentColor = palette.textSecondary,
-        confirmButton = { TextButton(onClick = onDismiss) { Text("完成", color = palette.primary) } },
-        title = { Text("选择瓦片坐标系", style = MaterialTheme.typography.title) },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_done), color = palette.primary) } },
+        title = { Text(stringResource(R.string.offline_crs_title), style = MaterialTheme.typography.title) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 Text(
-                    "请按瓦片来源平台选择,选错会导致车标与底图错位约 300~600 米。",
+                    stringResource(R.string.offline_crs_desc),
                     style = MaterialTheme.typography.caption,
                     color = palette.textTertiary,
                     modifier = Modifier.padding(bottom = Space.sm),

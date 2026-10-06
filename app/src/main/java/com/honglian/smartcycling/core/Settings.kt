@@ -150,6 +150,58 @@ class Settings(context: Context) {
         get() = prefs.getBoolean(KEY_LOCAL_ONLY, false)
         set(value) { prefs.edit().putBoolean(KEY_LOCAL_ONLY, value).apply() }
 
+    /**
+     * 骑行时保持屏幕常亮(默认开)。
+     *
+     * 第一性原理:常亮只在"骑行中"这一种状态下才有意义 —— 用户需要随时瞥一眼仪表盘。
+     * 若在全局无条件开启,则浏览历史/翻设置时屏幕也永不熄灭,纯属耗电。
+     * 因此该开关只在进入骑行页时生效,退出骑行立即清除。
+     */
+    var keepScreenOnWhileRiding: Boolean
+        get() = prefs.getBoolean(KEY_KEEP_SCREEN_ON, true)
+        set(value) { prefs.edit().putBoolean(KEY_KEEP_SCREEN_ON, value).apply() }
+
+    /**
+     * 骑行时锁定当前屏幕方向(默认关)。
+     *
+     * 手机固定在车把支架上时,路面颠簸会让重力感应误判方向,导致横竖屏来回切换。
+     * 开启后进入骑行会锁定为进入瞬间的方向,退出骑行恢复自适应。
+     */
+    var lockOrientationWhileRiding: Boolean
+        get() = prefs.getBoolean(KEY_LOCK_ORIENTATION, false)
+        set(value) { prefs.edit().putBoolean(KEY_LOCK_ORIENTATION, value).apply() }
+
+    /**
+     * 单位制(公制 / 英制)。默认公制。
+     *
+     * 只影响显示层:内部计算与落库永远是米 / km/h(见 [Units])。
+     */
+    private val _unitSystem = MutableStateFlow(
+        runCatching { UnitSystem.valueOf(prefs.getString(KEY_UNIT_SYSTEM, null) ?: "") }
+            .getOrDefault(UnitSystem.METRIC),
+    )
+    val unitSystemFlow: StateFlow<UnitSystem> = _unitSystem
+
+    var unitSystem: UnitSystem
+        get() = _unitSystem.value
+        set(value) {
+            prefs.edit().putString(KEY_UNIT_SYSTEM, value.name).apply()
+            _unitSystem.value = value
+        }
+
+    /** 是否开启自动分圈。 */
+    var autoLapEnabled: Boolean
+        get() = prefs.getBoolean(KEY_AUTO_LAP, false)
+        set(value) { prefs.edit().putBoolean(KEY_AUTO_LAP, value).apply() }
+
+    /**
+     * 自动分圈距离(公里)。内部始终以公里存储,显示时再按单位制换算 ——
+     * 这样"切成英制再切回公制"不会因为反复换算产生累计误差。
+     */
+    var autoLapDistanceKm: Float
+        get() = prefs.getFloat(KEY_AUTO_LAP_DIST, 5.0f)
+        set(value) { prefs.edit().putFloat(KEY_AUTO_LAP_DIST, value).apply() }
+
     /** 已记住的心率带 MAC 地址;非空时扫描到该设备会自动回连。 */
     var hrDeviceAddress: String
         get() = prefs.getString(KEY_HR_ADDR, "") ?: ""
@@ -176,6 +228,11 @@ class Settings(context: Context) {
         private const val KEY_HIGH_CONTRAST = "high_contrast"
         private const val KEY_ONBOARDING = "onboarding_shown"
         private const val KEY_LOCAL_ONLY = "local_only_mode"
+        private const val KEY_KEEP_SCREEN_ON = "keep_screen_on_while_riding"
+        private const val KEY_LOCK_ORIENTATION = "lock_orientation_while_riding"
+        private const val KEY_UNIT_SYSTEM = "unit_system"
+        private const val KEY_AUTO_LAP = "auto_lap_enabled"
+        private const val KEY_AUTO_LAP_DIST = "auto_lap_distance_km"
         private const val KEY_HR_ADDR = "hr_device_address"
         private const val KEY_HR_NAME = "hr_device_name"
     }

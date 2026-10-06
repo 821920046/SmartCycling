@@ -3,4 +3,251 @@
     <string name="ride_channel_name">骑行记录</string>
     <string name="ride_notification_title">智能骑行记录中</string>
     <string name="ride_notification_text">GPS 与传感器数据正在记录</string>
+
+    <!-- 通用动作 -->
+    <string name="action_back">返回</string>
+    <string name="action_cancel">取消</string>
+    <string name="action_close">关闭</string>
+    <string name="action_done">完成</string>
+    <string name="action_clear">清空</string>
+
+    <!-- 崩溃提示 -->
+    <string name="crash_dialog_title">上次运行发生崩溃</string>
+    <string name="crash_copy_log">复制日志</string>
+
+    <!-- 设置页 -->
+    <string name="settings_title">设置</string>
+
+    <string name="settings_section_profile">骑行档案</string>
+    <string name="settings_rider_name">骑手昵称</string>
+    <string name="settings_wheel_circumference">车轮周长 %1$d mm</string>
+
+    <string name="settings_section_appearance">外观</string>
+    <string name="settings_theme_mode">主题模式</string>
+    <string name="theme_system">跟随系统</string>
+    <string name="theme_light">浅色</string>
+    <string name="theme_light_desc">浅色(户外日光可读性最佳)</string>
+    <string name="theme_dark">深色</string>
+    <string name="theme_dark_desc">深色(夜骑省电)</string>
+    <string name="map_layer_standard">标准</string>
+    <string name="map_layer_satellite">卫星</string>
+    <string name="map_layer_night">夜间</string>
+    <string name="settings_default_map_layer">默认地图图层(在线引擎)</string>
+    <string name="settings_high_contrast">日照高对比模式</string>
+    <string name="settings_high_contrast_desc">强光下加深仪表盘背景、提升文字对比</string>
+
+    <string name="settings_section_map_data">地图数据</string>
+    <string name="map_source_online">在线</string>
+    <string name="map_source_offline">离线</string>
+    <string name="settings_map_engine">底图引擎</string>
+    <string name="settings_offline_maps">离线地图管理</string>
+    <string name="settings_offline_maps_desc">导入 MBTiles / ZIP / 瓦片文件夹,设置坐标系</string>
+
+    <string name="settings_section_training">训练与骑行偏好</string>
+    <string name="settings_unit_system">单位制</string>
+    <string name="unit_metric">公制 km</string>
+    <string name="unit_imperial">英制 mi</string>
+    <string name="settings_rider_weight">体重 (kg,用于卡路里估算)</string>
+    <string name="settings_auto_lap">自动分圈</string>
+    <string name="settings_auto_lap_desc">每骑行指定距离自动记录一圈,便于分段对比速度与心率</string>
+    <string name="settings_auto_lap_distance">分圈距离:%1$s</string>
+    <string name="settings_auto_pause">自动暂停</string>
+    <string name="settings_auto_pause_desc">静止超过 5 秒自动暂停计时,恢复移动自动继续</string>
+    <string name="settings_auto_pause_threshold">自动暂停阈值:%1$.1f km/h</string>
+    <string name="settings_keep_screen_on">骑行时保持屏幕常亮</string>
+    <string name="settings_keep_screen_on_desc">仅骑行期间常亮,方便随时查看仪表盘;退出骑行自动恢复熄屏</string>
+    <string name="settings_lock_orientation">骑行时锁定屏幕方向</string>
+    <string name="settings_lock_orientation_desc">锁定为进入骑行时的方向,避免颠簸导致横竖屏来回切换</string>
+
+    <string name="settings_section_cloud">云端同步(可选)</string>
+    <string name="settings_cloud_url">中控 API 地址</string>
+    <string name="settings_cloud_token">访问令牌</string>
+    <string name="settings_cloud_token_desc">留空则不上传;令牌与服务端 SYNC_TOKEN 一致即可。</string>
+    <string name="settings_local_only">仅本地模式</string>
+    <string name="settings_local_only_desc">开启后骑行记录只存本机,绝不上传云端</string>
+    <string name="settings_privacy_note">隐私说明:定位与轨迹仅用于导航和骑行统计,默认只保存在本机;仅当你填写上方服务器地址且未开启「仅本地模式」时才会上传。</string>
+    <string name="settings_clear_all">清空本机全部骑行记录</string>
+
+    <string name="settings_section_about">关于</string>
+    <string name="settings_about_version">智能骑行 SmartCycling · %1$s</string>
+    <string name="settings_about_credits">在线底图与路线规划由高德提供;离线底图由 osmdroid 渲染(Apache-2.0)。</string>
+
+    <string name="settings_clear_confirm_title">清空全部记录?</string>
+    <string name="settings_clear_confirm_text">将删除本机所有骑行记录与轨迹点,操作不可撤销。</string>
+
+    <string name="settings_wheel_dialog_title">车轮周长标定</string>
+    <string name="settings_wheel_mm">%1$d mm</string>
+
+    <!-- 骑行成绩总结页 -->
+    <string name="summary_title">🏁 骑行完成</string>
+    <string name="summary_too_short">本次骑行时长过短,未生成成绩。</string>
+    <string name="summary_total_duration">总时长</string>
+    <string name="summary_avg_speed">平均速度</string>
+    <string name="summary_max_speed">最高速度</string>
+    <string name="summary_avg_cadence">平均踏频</string>
+    <string name="summary_calories">消耗热量</string>
+    <string name="summary_elevation_gain">累计爬升</string>
+    <string name="summary_avg_hr">平均心率</string>
+    <string name="summary_max_hr">最大心率</string>
+    <string name="summary_share_chooser">分享骑行成绩</string>
+    <string name="summary_share">📤 分享成绩</string>
+    <string name="summary_export_gpx">💾 导出 GPX 轨迹</string>
+    <string name="summary_done">完成 · 返回地图</string>
+    <string name="summary_share_text">我用智能骑行完成了一次骑行 🚴\n里程 %1$s · 时长 %2$s · 均速 %3$s · 最高 %4$s · 热量 %5$.0f kcal · 爬升 %6$s</string>
+
+    <!-- 分圈(自动计圈) -->
+    <string name="laps_title">分圈明细</string>
+    <string name="lap_number">第 %1$d 圈</string>
+    <string name="lap_in_progress">进行中</string>
+    <string name="ride_hud_lap">第 %1$d 圈 · %2$s</string>
+
+    <!-- 断点续记 -->
+    <string name="recover_title">发现未完成的骑行</string>
+    <string name="recover_text">上次骑行未正常结束(可能因闪退或被系统回收)。可以继续骑,也可以直接保存或丢弃这条记录。</string>
+    <string name="recover_detail">%1$s · %2$s</string>
+    <string name="recover_resume">继续骑行</string>
+    <string name="recover_finalize">保存并结束</string>
+    <string name="recover_discard">丢弃</string>
+
+    <!-- 首次使用引导 -->
+    <string name="onboarding_title">欢迎使用智能骑行</string>
+    <string name="onboarding_step1">1． 开机自动配对迈金 S314 速度/踏频传感器。</string>
+    <string name="onboarding_step2">2． 在地图搜索目的地,点“开始骑行”进入 turn-by-turn 导航。</string>
+    <string name="onboarding_step3">3． 骑行页左侧导航、右侧仪表盘可拖动缩放;可锁屏防误触。</string>
+    <string name="onboarding_step4">4． 结束后自动生成成绩总结并可一键分享。</string>
+    <string name="onboarding_start">开始骑行</string>
+
+    <!-- 骑行页 -->
+    <string name="ride_hud_hint">✥ 悬浮仪表 · 拖动 · 双指缩放 · 双击复位</string>
+    <string name="ride_resume">▶ 恢复</string>
+    <string name="ride_pause">⏸ 暂停</string>
+    <string name="ride_stop">■ 结束骑行</string>
+    <string name="ride_stop_short">■ 结束</string>
+    <string name="ride_locked">🔒 已锁定 · 长按解锁</string>
+    <string name="ride_lock">🔓 锁屏</string>
+    <string name="ride_stop_confirm_title">确认结束本次骑行？</string>
+    <string name="ride_stop_confirm_text">本次骑行的轨迹与传感器数据将被存入本地数据库并同步至云端中控。</string>
+    <string name="ride_confirm_stop">确认结束</string>
+    <string name="ride_continue">继续骑行</string>
+    <string name="ride_stat_duration">骑行时长</string>
+    <string name="ride_stat_distance">骑行路程</string>
+    <string name="ride_stat_avg_speed">均速</string>
+    <string name="ride_stat_avg_cadence">平均踏频</string>
+    <string name="ride_stat_cadence">踏频</string>
+    <string name="ride_stat_live_hr">实时心率</string>
+    <string name="ride_status_auto_paused">⏱ 自动暂停中</string>
+    <string name="ride_status_cadence">踏频 · 实时 rpm</string>
+    <string name="ride_status_sensor">速度来源 · 传感器</string>
+    <string name="ride_status_gps">速度来源 · GPS</string>
+    <string name="ride_banner_after">%1$s 后</string>
+    <string name="ride_banner_along">沿当前道路</string>
+    <string name="ride_banner_remaining">剩余</string>
+    <string name="ride_duration_hm">%1$d小时%2$d分</string>
+    <string name="ride_duration_min">%1$d 分</string>
+    <string name="ride_voice_on">🔊 语音开</string>
+    <string name="ride_voice_off">🔇 语音关</string>
+
+    <!-- 导航语音播报 -->
+    <string name="navi_tts_ready">骑行导航语音已开启</string>
+    <string name="navi_tts_start">开始骑行导航，全程约 %1$s</string>
+    <string name="navi_turn_left">左转</string>
+    <string name="navi_turn_right">右转</string>
+    <string name="navi_tts_turn">前方 %1$s%2$s</string>
+    <string name="navi_tts_arrive">即将到达目的地</string>
+
+    <!-- 语音播报用的单位"词"(不能用 km / ft 这类符号,中文 TTS 会把 m 念成字母) -->
+    <string name="unit_word_km">公里</string>
+    <string name="unit_word_meter">米</string>
+    <string name="unit_word_mile">英里</string>
+    <string name="unit_word_foot">英尺</string>
+
+    <!-- 地图标记 -->
+    <string name="map_marker_destination">目的地</string>
+    <string name="map_marker_my_location">我的位置</string>
+
+    <!-- 地图主界面 -->
+    <string name="map_search_hint">搜索目的地</string>
+    <string name="map_plan">规划</string>
+    <string name="map_nav_history">骑行历史</string>
+    <string name="map_nav_offline_maps">离线地图</string>
+    <string name="map_estimated_distance">预计骑行 %1$s</string>
+    <string name="map_unknown_place">未知地点</string>
+    <string name="map_wheel_dialog_desc">用于无 GPS 时按轮转圈数回退计算速度与里程。</string>
+    <string name="map_wheel_circumference">周长 %1$d mm</string>
+    <string name="map_layer_dialog_title">地图图层</string>
+    <string name="map_layer_dialog_desc">图层切换在「在线」引擎下生效;离线包使用其自带样式。</string>
+
+    <!-- 传感器配对页 -->
+    <string name="pairing_title">连接骑行传感器</string>
+    <string name="pairing_subtitle">智能骑行 · 迈金 S314 速度 / 踏频</string>
+    <string name="pairing_wake_hint">转动一下轮子或曲柄可主动唤醒传感器</string>
+    <string name="pairing_rescan">重新扫描</string>
+    <string name="pairing_skip">跳过,仅用 GPS 记录</string>
+    <string name="pairing_need_hw_title">需要开启蓝牙与定位</string>
+    <string name="pairing_bt_off">• 蓝牙未开启</string>
+    <string name="pairing_loc_off">• 定位服务未开启</string>
+    <string name="pairing_hw_rationale">蓝牙用于连接骑行传感器获取精准速度与踏频;定位用于轨迹记录与导航。开启后返回本页会自动继续。</string>
+    <string name="pairing_open_bt">去开启蓝牙</string>
+    <string name="pairing_open_loc">去开启定位</string>
+    <string name="pairing_perm_title">权限使用说明</string>
+    <string name="pairing_perm_bt">• 附近设备/蓝牙:扫描并连接迈金 S314 速度踏频传感器,获取精准速度与踏频。</string>
+    <string name="pairing_perm_loc">• 位置信息:用于地图导航、路径规划与骑行轨迹记录;低版本系统上蓝牙扫描也依赖定位权限。</string>
+    <string name="pairing_perm_note">以上数据默认仅保存在本机,不用于导航与统计以外的用途。</string>
+    <string name="pairing_perm_agree">同意并授权</string>
+    <string name="pairing_perm_later">暂不</string>
+    <string name="pairing_need_bt">请先开启蓝牙</string>
+    <string name="pairing_need_loc">请先开启定位服务</string>
+    <string name="pairing_connecting">正在建立连接…</string>
+    <string name="pairing_connected">连接成功,正在载入…</string>
+    <string name="pairing_disconnecting">传感器断开中…</string>
+    <string name="pairing_searching">正在搜索附近的传感器…</string>
+    <string name="pairing_hr_connected">❤ 心率带已连接</string>
+    <string name="pairing_hr_connecting">❤ 心率带连接中…</string>
+    <string name="pairing_hr_hint">❤ 心率带(可选):开启心率带电源即可自动连接</string>
+    <string name="pairing_no_device">未发现设备,保持传感器处于活动状态</string>
+    <string name="pairing_unknown_device">未知设备</string>
+
+    <!-- 骑行历史 -->
+    <string name="history_export_all">导出全部 GPX</string>
+    <string name="history_export_gpx">导出 GPX</string>
+    <string name="history_total_distance">累计里程</string>
+    <string name="history_ride_count">骑行次数</string>
+    <string name="history_unit_times">次</string>
+    <string name="history_total_duration">累计时长</string>
+    <string name="history_personal_records">个人纪录</string>
+    <string name="history_pr_distance">最远单次</string>
+    <string name="history_pr_speed">最快均速</string>
+    <string name="history_pr_duration">最长时长</string>
+    <string name="history_pr_elevation">最大爬升</string>
+    <string name="history_empty">暂无骑行记录,完成一次骑行后会显示在这里。</string>
+    <string name="history_no_track">该次骑行没有采集到有效轨迹点</string>
+    <string name="history_ride_subtitle">%1$s · %2$s · 均速 %3$s</string>
+    <string name="history_avg_speed_short">均速 %1$s</string>
+    <string name="history_ride_facts">%1$.0f kcal · 爬升 %2$s</string>
+    <string name="history_ride_hr_suffix"> · ❤ %1$.0f</string>
+    <string name="action_delete">删除</string>
+
+    <!-- 离线地图管理页 -->
+    <string name="offline_import_file">导入文件</string>
+    <string name="offline_import_folder">导入文件夹</string>
+    <string name="offline_copying_progress">正在拷贝到应用私有目录 %1$d%%，完成后解析元数据…</string>
+    <string name="offline_copying">正在拷贝到应用私有目录并解析元数据,大文件可能需要数十秒…</string>
+    <string name="offline_got_it">知道了</string>
+    <string name="offline_empty">还没有导入任何离线地图</string>
+    <string name="offline_delete_title">删除离线地图?</string>
+    <string name="offline_delete_text">将从设备上永久删除「%1$s」及其瓦片文件(%2$s)。此操作不可撤销。</string>
+    <string name="offline_guide_title">支持哪些离线地图?如何获取?</string>
+    <string name="offline_collapse">收起</string>
+    <string name="offline_expand">展开</string>
+    <string name="offline_guide_line1">支持格式:MBTiles(.mbtiles)、ZIP 瓦片包、{z}/{x}/{y} 瓦片文件夹、osmdroid SQLite。</string>
+    <string name="offline_guide_line2">制作方式:用 SAS.Planet / Mobile Atlas Creator / QGIS 选择任意平台(高德、腾讯、百度、Google、OSM、Mapbox)导出为 MBTiles 或瓦片目录,再导入本页。</string>
+    <string name="offline_guide_line3">坐标系:高德 / 腾讯 = GCJ-02;百度 = BD-09;OSM / Google(海外) / Mapbox = WGS-84。导入后请在条目上点「坐标系」核对,选错会导致车标整体偏移数百米。</string>
+    <string name="offline_guide_line4">GeoPackage 与 PMTiles 暂不支持直接渲染,请先转换为 MBTiles。</string>
+    <string name="offline_guide_line5">瓦片数据请自行确保合法授权;本应用仅做本地渲染,不提供任何地图数据下载。</string>
+    <string name="offline_missing">文件已丢失,请删除后重新导入。</string>
+    <string name="offline_crs">坐标系</string>
+    <string name="offline_edit">修改</string>
+    <string name="offline_card_meta">%1$s · z%2$d-%3$d · %4$d 张 · %5$s</string>
+    <string name="offline_crs_title">选择瓦片坐标系</string>
+    <string name="offline_crs_desc">请按瓦片来源平台选择,选错会导致车标与底图错位约 300~600 米。</string>
 </resources>

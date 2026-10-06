@@ -66,6 +66,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -73,6 +74,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.location.LocationManagerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.honglian.smartcycling.R
 import com.honglian.smartcycling.ble.ConnectionState
 import com.honglian.smartcycling.pairing.DiscoveredDevice
 import com.honglian.smartcycling.ui.theme.AppTheme
@@ -147,13 +149,13 @@ fun PairingScreen(
         ) {
             Spacer(Modifier.height(Space.xxl))
             Text(
-                text = "连接骑行传感器",
+                text = stringResource(R.string.pairing_title),
                 style = MaterialTheme.typography.headlineMedium,
                 color = palette.textPrimary,
             )
             Spacer(Modifier.height(Space.xs))
             Text(
-                text = "智能骑行 · 迈金 S314 速度 / 踏频",
+                text = stringResource(R.string.pairing_subtitle),
                 style = MaterialTheme.typography.label,
                 color = palette.textSecondary,
             )
@@ -179,7 +181,7 @@ fun PairingScreen(
 
                 if (connection == ConnectionState.DISCONNECTED) {
                     Text(
-                        text = "转动一下轮子或曲柄可主动唤醒传感器",
+                        text = stringResource(R.string.pairing_wake_hint),
                         style = MaterialTheme.typography.caption,
                         color = palette.textTertiary,
                     )
@@ -195,13 +197,13 @@ fun PairingScreen(
                     ) {
                         Icon(Icons.Outlined.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(Space.sm))
-                        Text("重新扫描", style = MaterialTheme.typography.subtitle)
+                        Text(stringResource(R.string.pairing_rescan), style = MaterialTheme.typography.subtitle)
                     }
                     Spacer(Modifier.height(Space.sm))
                     // 传感器没电/不在身边时不应把用户卡死在配对页:GPS 本身即可完成基础骑行记录。
                     TextButton(onClick = onSkip) {
                         Text(
-                            "跳过,仅用 GPS 记录",
+                            stringResource(R.string.pairing_skip),
                             style = MaterialTheme.typography.label,
                             color = palette.textTertiary,
                         )
@@ -220,14 +222,14 @@ fun PairingScreen(
             containerColor = palette.surface,
             titleContentColor = palette.textPrimary,
             textContentColor = palette.textSecondary,
-            title = { Text("需要开启蓝牙与定位", style = MaterialTheme.typography.title) },
+            title = { Text(stringResource(R.string.pairing_need_hw_title), style = MaterialTheme.typography.title) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(Space.xs)) {
-                    if (!bluetoothOn) Text("• 蓝牙未开启", color = palette.danger, style = MaterialTheme.typography.label)
-                    if (!locationOn) Text("• 定位服务未开启", color = palette.danger, style = MaterialTheme.typography.label)
+                    if (!bluetoothOn) Text(stringResource(R.string.pairing_bt_off), color = palette.danger, style = MaterialTheme.typography.label)
+                    if (!locationOn) Text(stringResource(R.string.pairing_loc_off), color = palette.danger, style = MaterialTheme.typography.label)
                     Spacer(Modifier.height(Space.xs))
                     Text(
-                        "蓝牙用于连接骑行传感器获取精准速度与踏频;定位用于轨迹记录与导航。开启后返回本页会自动继续。",
+                        stringResource(R.string.pairing_hw_rationale),
                         style = MaterialTheme.typography.body,
                     )
                 }
@@ -236,13 +238,16 @@ fun PairingScreen(
                 TextButton(onClick = {
                     if (!bluetoothOn) openBluetoothSettings(context) else openLocationSettings(context)
                 }) {
-                    Text(if (!bluetoothOn) "去开启蓝牙" else "去开启定位", color = palette.primary)
+                    Text(
+                        stringResource(if (!bluetoothOn) R.string.pairing_open_bt else R.string.pairing_open_loc),
+                        color = palette.primary,
+                    )
                 }
             },
             dismissButton = {
                 if (!bluetoothOn && !locationOn) {
                     TextButton(onClick = { openLocationSettings(context) }) {
-                        Text("去开启定位", color = palette.primary)
+                        Text(stringResource(R.string.pairing_open_loc), color = palette.primary)
                     }
                 } else null
             },
@@ -257,24 +262,24 @@ fun PairingScreen(
             containerColor = palette.surface,
             titleContentColor = palette.textPrimary,
             textContentColor = palette.textSecondary,
-            title = { Text("权限使用说明", fontWeight = FontWeight.Bold) },
+            title = { Text(stringResource(R.string.pairing_perm_title), fontWeight = FontWeight.Bold) },
             text = {
                 Column {
-                    Text("• 附近设备/蓝牙:扫描并连接迈金 S314 速度踏频传感器,获取精准速度与踏频。", fontSize = 13.sp, lineHeight = 19.sp)
+                    Text(stringResource(R.string.pairing_perm_bt), fontSize = 13.sp, lineHeight = 19.sp)
                     Spacer(Modifier.height(8.dp))
-                    Text("• 位置信息:用于地图导航、路径规划与骑行轨迹记录;低版本系统上蓝牙扫描也依赖定位权限。", fontSize = 13.sp, lineHeight = 19.sp)
+                    Text(stringResource(R.string.pairing_perm_loc), fontSize = 13.sp, lineHeight = 19.sp)
                     Spacer(Modifier.height(8.dp))
-                    Text("以上数据默认仅保存在本机,不用于导航与统计以外的用途。", fontSize = 12.sp, color = palette.primary, lineHeight = 18.sp)
+                    Text(stringResource(R.string.pairing_perm_note), fontSize = 12.sp, color = palette.primary, lineHeight = 18.sp)
                 }
             },
             confirmButton = {
                 TextButton(onClick = {
                     showPermRationale = false
                     permissionLauncher.launch(blePermissions())
-                }) { Text("同意并授权", color = palette.primary, fontWeight = FontWeight.Bold) }
+                }) { Text(stringResource(R.string.pairing_perm_agree), color = palette.primary, fontWeight = FontWeight.Bold) }
             },
             dismissButton = {
-                TextButton(onClick = { showPermRationale = false }) { Text("暂不", color = palette.textSecondary) }
+                TextButton(onClick = { showPermRationale = false }) { Text(stringResource(R.string.pairing_perm_later), color = palette.textSecondary) }
             },
         )
     }
@@ -297,7 +302,7 @@ private fun HardwareBlocked(
             )
             Spacer(Modifier.height(Space.md))
             Text(
-                text = if (!bluetoothOn) "请先开启蓝牙" else "请先开启定位服务",
+                text = stringResource(if (!bluetoothOn) R.string.pairing_need_bt else R.string.pairing_need_loc),
                 style = MaterialTheme.typography.subtitle,
                 color = palette.textSecondary,
             )
@@ -312,20 +317,20 @@ private fun ConnectionStatus(connection: ConnectionState) {
         ConnectionState.CONNECTING -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
             CircularProgressIndicator(color = palette.primary, strokeWidth = 3.dp)
             Spacer(Modifier.height(Space.md))
-            Text("正在建立连接…", style = MaterialTheme.typography.subtitle, color = palette.primary)
+            Text(stringResource(R.string.pairing_connecting), style = MaterialTheme.typography.subtitle, color = palette.primary)
         }
         ConnectionState.READY -> Text(
-            "连接成功,正在载入…",
+            stringResource(R.string.pairing_connected),
             style = MaterialTheme.typography.subtitle,
             color = palette.success,
         )
         ConnectionState.DISCONNECTING -> Text(
-            "传感器断开中…",
+            stringResource(R.string.pairing_disconnecting),
             style = MaterialTheme.typography.body,
             color = palette.textSecondary,
         )
         ConnectionState.DISCONNECTED -> Text(
-            "正在搜索附近的传感器…",
+            stringResource(R.string.pairing_searching),
             style = MaterialTheme.typography.subtitle,
             color = palette.textSecondary,
         )
@@ -341,17 +346,17 @@ private fun HrStatus(hrConnection: ConnectionState) {
     Spacer(Modifier.height(Space.xs))
     when (hrConnection) {
         ConnectionState.READY -> Text(
-            "❤ 心率带已连接",
+            stringResource(R.string.pairing_hr_connected),
             style = MaterialTheme.typography.caption,
             color = palette.success,
         )
         ConnectionState.CONNECTING, ConnectionState.DISCONNECTING -> Text(
-            "❤ 心率带连接中…",
+            stringResource(R.string.pairing_hr_connecting),
             style = MaterialTheme.typography.caption,
             color = palette.textSecondary,
         )
         ConnectionState.DISCONNECTED -> Text(
-            "❤ 心率带(可选):开启心率带电源即可自动连接",
+            stringResource(R.string.pairing_hr_hint),
             style = MaterialTheme.typography.caption,
             color = palette.textTertiary,
         )
@@ -375,7 +380,7 @@ private fun DeviceList(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        "未发现设备,保持传感器处于活动状态",
+                        stringResource(R.string.pairing_no_device),
                         style = MaterialTheme.typography.body,
                         color = palette.textTertiary,
                     )
@@ -391,6 +396,8 @@ private fun DeviceList(
 @Composable
 private fun DeviceRow(device: DiscoveredDevice, onClick: () -> Unit) {
     val palette = AppTheme.palette
+    // ifBlank 的 lambda 不是组合上下文,回退文案需在此提前取好。
+    val unknownDevice = stringResource(R.string.pairing_unknown_device)
     val tag = buildList {
         if (device.hasCsc) add("CSC")
         if (device.hasHrs) add("HR")
@@ -443,7 +450,7 @@ private fun DeviceRow(device: DiscoveredDevice, onClick: () -> Unit) {
                 Spacer(Modifier.width(Space.md))
                 Column {
                     Text(
-                        text = device.name.ifBlank { "未知设备" } + tag,
+                        text = device.name.ifBlank { unknownDevice } + tag,
                         style = MaterialTheme.typography.subtitle,
                         color = palette.textPrimary,
                     )

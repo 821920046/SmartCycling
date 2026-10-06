@@ -31,6 +31,13 @@ data class RideEntity(
     @ColumnInfo(defaultValue = "0") val avgHeartRateBpm: Double = 0.0,
     /** 最大心率(bpm);未连接心率带时为 0。 */
     @ColumnInfo(defaultValue = "0") val maxHeartRateBpm: Int = 0,
+    /**
+     * 本次骑行使用的自动分圈距离(米);0 表示未开启分圈。
+     *
+     * 存下来是为了让分圈**可重算**:分圈边界由"轨迹点 + 这个阈值"共同决定,
+     * 不存阈值的话,用户日后改设置会让历史记录的分圈跟着变。
+     */
+    @ColumnInfo(defaultValue = "0") val lapDistanceM: Double = 0.0,
 )
 
 /** 轨迹点,关联到具体骑行。 */
@@ -55,4 +62,11 @@ data class TrackPointEntity(
     val timestampMs: Long,
     /** 海拔(米,来自 GPS 高程);0 表示无效值。用于 GPX 导出与爬升回放。 */
     @ColumnInfo(defaultValue = "0") val elevationM: Double = 0.0,
+    /**
+     * 该轨迹点时刻的心率(bpm);未连接心率带或该时刻无读数为 0。
+     *
+     * 逐点存心率是**分圈心率**的前提:分圈由轨迹点推导,若点上没有心率,
+     * 就只能给出整段的平均值,间歇训练复盘时基本没用。
+     */
+    @ColumnInfo(defaultValue = "0") val heartRateBpm: Int = 0,
 )

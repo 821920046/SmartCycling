@@ -9,8 +9,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import com.honglian.smartcycling.core.ThemeMode
+import com.honglian.smartcycling.core.UnitSystem
+
+/**
+ * 当前生效的单位制。
+ *
+ * 与色板同理:单位是**全局显示偏好**,却被 HUD、成绩页、历史页等大量叶子组件读取。
+ * 逐层透传参数会污染十几个函数签名,因此同样用 CompositionLocal 下发。
+ */
+val LocalUnitSystem = staticCompositionLocalOf { UnitSystem.METRIC }
 
 /**
  * 应用主题入口。
@@ -23,6 +33,7 @@ import com.honglian.smartcycling.core.ThemeMode
 @Composable
 fun SmartCyclingTheme(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
+    unitSystem: UnitSystem = UnitSystem.METRIC,
     content: @Composable () -> Unit,
 ) {
     val dark = when (themeMode) {
@@ -33,7 +44,10 @@ fun SmartCyclingTheme(
     val palette = paletteFor(dark)
     val colorScheme = remember(palette) { palette.toColorScheme() }
 
-    CompositionLocalProvider(LocalAppPalette provides palette) {
+    CompositionLocalProvider(
+        LocalAppPalette provides palette,
+        LocalUnitSystem provides unitSystem,
+    ) {
         MaterialTheme(
             colorScheme = colorScheme,
             typography = AppTypography,
@@ -43,10 +57,14 @@ fun SmartCyclingTheme(
     }
 }
 
-/** 语义色板访问入口:`AppTheme.palette.textPrimary`。 */
+/** 主题访问入口:`AppTheme.palette.textPrimary` / `AppTheme.units`。 */
 object AppTheme {
     val palette: AppPalette
         @Composable @ReadOnlyComposable get() = LocalAppPalette.current
+
+    /** 当前单位制。配合 [com.honglian.smartcycling.core.Units] 做显示层换算。 */
+    val units: UnitSystem
+        @Composable @ReadOnlyComposable get() = LocalUnitSystem.current
 }
 
 private fun AppPalette.toColorScheme() = if (isDark) {

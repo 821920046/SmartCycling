@@ -54,12 +54,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.honglian.smartcycling.BuildConfig
+import com.honglian.smartcycling.R
 import com.honglian.smartcycling.core.MapSource
 import com.honglian.smartcycling.core.SettingsViewModel
 import com.honglian.smartcycling.core.ThemeMode
+import com.honglian.smartcycling.core.UnitSystem
+import com.honglian.smartcycling.core.Units
 import com.honglian.smartcycling.core.WheelPreset
 import com.honglian.smartcycling.ui.theme.AppTheme
 import com.honglian.smartcycling.ui.theme.Radius
@@ -89,6 +94,11 @@ fun SettingsScreen(
     val autoPauseThreshold by viewModel.autoPauseThresholdKmh.collectAsState()
     val highContrast by viewModel.highContrast.collectAsState()
     val localOnly by viewModel.localOnly.collectAsState()
+    val keepScreenOn by viewModel.keepScreenOn.collectAsState()
+    val lockOrientation by viewModel.lockOrientation.collectAsState()
+    val unitSystem by viewModel.unitSystem.collectAsState()
+    val autoLapEnabled by viewModel.autoLapEnabled.collectAsState()
+    val autoLapDistanceKm by viewModel.autoLapDistanceKm.collectAsState()
 
     var nameInput by remember(riderName) { mutableStateOf(riderName) }
     // 注意:weightInput 不能用 riderWeight 作 remember 键 —— 每次输入都会写回 riderWeight,
@@ -121,10 +131,14 @@ fun SettingsScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(onClick = { persist(); onBack() }) {
-                    Icon(Icons.Outlined.ArrowBack, contentDescription = "返回", tint = palette.textPrimary)
+                    Icon(
+                        Icons.Outlined.ArrowBack,
+                        contentDescription = stringResource(R.string.action_back),
+                        tint = palette.textPrimary,
+                    )
                 }
                 Text(
-                    "设置",
+                    stringResource(R.string.settings_title),
                     style = MaterialTheme.typography.title,
                     color = palette.textPrimary,
                     modifier = Modifier.weight(1f),
@@ -140,11 +154,11 @@ fun SettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(Space.md),
             ) {
                 // ---- 骑行档案 ----
-                Section(icon = Icons.Outlined.Person, title = "骑行档案") {
+                Section(icon = Icons.Outlined.Person, title = stringResource(R.string.settings_section_profile)) {
                     OutlinedTextField(
                         value = nameInput,
                         onValueChange = { nameInput = it },
-                        label = { Text("骑手昵称") },
+                        label = { Text(stringResource(R.string.settings_rider_name)) },
                         singleLine = true,
                         shape = RoundedCornerShape(Radius.md),
                         colors = fieldColors(),
@@ -153,66 +167,86 @@ fun SettingsScreen(
                     Spacer(Modifier.height(Space.sm))
                     RowItem(
                         title = wheel.label,
-                        subtitle = "车轮周长 ${wheel.circumferenceMm} mm",
+                        subtitle = stringResource(R.string.settings_wheel_circumference, wheel.circumferenceMm),
                         icon = Icons.Outlined.DirectionsBike,
                         onClick = { showWheelDialog = true },
                     )
                 }
 
                 // ---- 外观 ----
-                Section(icon = Icons.Outlined.Palette, title = "外观") {
+                Section(icon = Icons.Outlined.Palette, title = stringResource(R.string.settings_section_appearance)) {
                     RowItem(
-                        title = "主题模式",
+                        title = stringResource(R.string.settings_theme_mode),
                         subtitle = when (themeMode) {
-                            ThemeMode.SYSTEM -> "跟随系统"
-                            ThemeMode.LIGHT -> "浅色(户外日光可读性最佳)"
-                            ThemeMode.DARK -> "深色(夜骑省电)"
+                            ThemeMode.SYSTEM -> stringResource(R.string.theme_system)
+                            ThemeMode.LIGHT -> stringResource(R.string.theme_light_desc)
+                            ThemeMode.DARK -> stringResource(R.string.theme_dark_desc)
                         },
                         icon = Icons.Outlined.Palette,
                         onClick = { showThemeDialog = true },
                     )
                     Spacer(Modifier.height(Space.sm))
                     SegmentedRow(
-                        options = listOf(1 to "标准", 2 to "卫星", 3 to "夜间"),
+                        options = listOf(
+                            1 to stringResource(R.string.map_layer_standard),
+                            2 to stringResource(R.string.map_layer_satellite),
+                            3 to stringResource(R.string.map_layer_night),
+                        ),
                         selected = mapType,
                         onSelect = { viewModel.updateMapType(it) },
-                        label = "默认地图图层(在线引擎)",
+                        label = stringResource(R.string.settings_default_map_layer),
                     )
                     Spacer(Modifier.height(Space.sm))
                     SwitchRow(
-                        title = "日照高对比模式",
-                        subtitle = "强光下加深仪表盘背景、提升文字对比",
+                        title = stringResource(R.string.settings_high_contrast),
+                        subtitle = stringResource(R.string.settings_high_contrast_desc),
                         checked = highContrast,
                         onCheckedChange = { viewModel.updateHighContrast(it) },
                     )
                 }
 
                 // ---- 地图数据 ----
-                Section(icon = Icons.Outlined.Map, title = "地图数据") {
+                Section(icon = Icons.Outlined.Map, title = stringResource(R.string.settings_section_map_data)) {
                     SegmentedRow(
-                        options = listOf(0 to "在线", 1 to "离线"),
+                        options = listOf(
+                            0 to stringResource(R.string.map_source_online),
+                            1 to stringResource(R.string.map_source_offline),
+                        ),
                         selected = if (mapSource == MapSource.ONLINE) 0 else 1,
                         onSelect = { viewModel.updateMapSource(if (it == 0) MapSource.ONLINE else MapSource.OFFLINE) },
-                        label = "底图引擎",
+                        label = stringResource(R.string.settings_map_engine),
                     )
                     Spacer(Modifier.height(Space.sm))
                     RowItem(
-                        title = "离线地图管理",
-                        subtitle = "导入 MBTiles / ZIP / 瓦片文件夹,设置坐标系",
+                        title = stringResource(R.string.settings_offline_maps),
+                        subtitle = stringResource(R.string.settings_offline_maps_desc),
                         icon = Icons.Outlined.Map,
                         onClick = onNavigateToOfflineMaps,
                     )
                 }
 
                 // ---- 训练与骑行偏好 ----
-                Section(icon = Icons.Outlined.DirectionsBike, title = "训练与骑行偏好") {
+                Section(icon = Icons.Outlined.DirectionsBike, title = stringResource(R.string.settings_section_training)) {
+                    // 单位制:只影响显示层,内部计算与落库永远是米 / km/h。
+                    SegmentedRow(
+                        options = listOf(
+                            0 to stringResource(R.string.unit_metric),
+                            1 to stringResource(R.string.unit_imperial),
+                        ),
+                        selected = if (unitSystem == UnitSystem.METRIC) 0 else 1,
+                        onSelect = {
+                            viewModel.updateUnitSystem(if (it == 0) UnitSystem.METRIC else UnitSystem.IMPERIAL)
+                        },
+                        label = stringResource(R.string.settings_unit_system),
+                    )
+                    Spacer(Modifier.height(Space.md))
                     OutlinedTextField(
                         value = weightInput,
                         onValueChange = {
                             weightInput = it
                             it.toFloatOrNull()?.let { w -> viewModel.updateRiderWeight(w) }
                         },
-                        label = { Text("体重 (kg,用于卡路里估算)") },
+                        label = { Text(stringResource(R.string.settings_rider_weight)) },
                         singleLine = true,
                         shape = RoundedCornerShape(Radius.md),
                         colors = fieldColors(),
@@ -220,14 +254,41 @@ fun SettingsScreen(
                     )
                     Spacer(Modifier.height(Space.sm))
                     SwitchRow(
-                        title = "自动暂停",
-                        subtitle = "静止超过 5 秒自动暂停计时,恢复移动自动继续",
+                        title = stringResource(R.string.settings_auto_lap),
+                        subtitle = stringResource(R.string.settings_auto_lap_desc),
+                        checked = autoLapEnabled,
+                        onCheckedChange = { viewModel.updateAutoLapEnabled(it) },
+                    )
+                    Spacer(Modifier.height(Space.sm))
+                    // 滑块按**显示单位**工作,写回时折成公里存储;切换单位制后刻度随之变化。
+                    Text(
+                        stringResource(
+                            R.string.settings_auto_lap_distance,
+                            Units.distanceText(autoLapDistanceKm.toDouble(), unitSystem, decimals = 1),
+                        ),
+                        style = MaterialTheme.typography.caption,
+                        color = palette.textTertiary,
+                    )
+                    Slider(
+                        value = Units.distance(autoLapDistanceKm.toDouble(), unitSystem).toFloat(),
+                        onValueChange = {
+                            viewModel.updateAutoLapDistance(
+                                Units.kmFromDistance(it.toDouble(), unitSystem).toFloat(),
+                            )
+                        },
+                        valueRange = Units.distance(0.5, unitSystem).toFloat()..Units.distance(50.0, unitSystem).toFloat(),
+                        enabled = autoLapEnabled,
+                    )
+                    Spacer(Modifier.height(Space.sm))
+                    SwitchRow(
+                        title = stringResource(R.string.settings_auto_pause),
+                        subtitle = stringResource(R.string.settings_auto_pause_desc),
                         checked = autoPauseEnabled,
                         onCheckedChange = { viewModel.updateAutoPauseEnabled(it) },
                     )
                     Spacer(Modifier.height(Space.sm))
                     Text(
-                        "自动暂停阈值:%.1f km/h".format(autoPauseThreshold),
+                        stringResource(R.string.settings_auto_pause_threshold, autoPauseThreshold),
                         style = MaterialTheme.typography.caption,
                         color = palette.textTertiary,
                     )
@@ -237,14 +298,28 @@ fun SettingsScreen(
                         valueRange = 0.5f..5f,
                         enabled = autoPauseEnabled,
                     )
+                    Spacer(Modifier.height(Space.sm))
+                    SwitchRow(
+                        title = stringResource(R.string.settings_keep_screen_on),
+                        subtitle = stringResource(R.string.settings_keep_screen_on_desc),
+                        checked = keepScreenOn,
+                        onCheckedChange = { viewModel.updateKeepScreenOn(it) },
+                    )
+                    Spacer(Modifier.height(Space.sm))
+                    SwitchRow(
+                        title = stringResource(R.string.settings_lock_orientation),
+                        subtitle = stringResource(R.string.settings_lock_orientation_desc),
+                        checked = lockOrientation,
+                        onCheckedChange = { viewModel.updateLockOrientation(it) },
+                    )
                 }
 
                 // ---- 云端同步 ----
-                Section(icon = Icons.Outlined.Cloud, title = "云端同步(可选)") {
+                Section(icon = Icons.Outlined.Cloud, title = stringResource(R.string.settings_section_cloud)) {
                     OutlinedTextField(
                         value = urlInput,
                         onValueChange = { urlInput = it },
-                        label = { Text("中控 API 地址") },
+                        label = { Text(stringResource(R.string.settings_cloud_url)) },
                         placeholder = { Text("https://your-worker.workers.dev") },
                         singleLine = true,
                         shape = RoundedCornerShape(Radius.md),
@@ -255,7 +330,7 @@ fun SettingsScreen(
                     OutlinedTextField(
                         value = tokenInput,
                         onValueChange = { tokenInput = it },
-                        label = { Text("访问令牌") },
+                        label = { Text(stringResource(R.string.settings_cloud_token)) },
                         singleLine = true,
                         shape = RoundedCornerShape(Radius.md),
                         colors = fieldColors(),
@@ -263,20 +338,20 @@ fun SettingsScreen(
                     )
                     Spacer(Modifier.height(Space.xs))
                     Text(
-                        "留空则不上传;令牌与服务端 SYNC_TOKEN 一致即可。",
+                        stringResource(R.string.settings_cloud_token_desc),
                         style = MaterialTheme.typography.caption,
                         color = palette.textTertiary,
                     )
                     Spacer(Modifier.height(Space.sm))
                     SwitchRow(
-                        title = "仅本地模式",
-                        subtitle = "开启后骑行记录只存本机,绝不上传云端",
+                        title = stringResource(R.string.settings_local_only),
+                        subtitle = stringResource(R.string.settings_local_only_desc),
                         checked = localOnly,
                         onCheckedChange = { viewModel.updateLocalOnly(it) },
                     )
                     Spacer(Modifier.height(Space.xs))
                     Text(
-                        "隐私说明:定位与轨迹仅用于导航和骑行统计,默认只保存在本机;仅当你填写上方服务器地址且未开启「仅本地模式」时才会上传。",
+                        stringResource(R.string.settings_privacy_note),
                         style = MaterialTheme.typography.caption,
                         color = palette.textTertiary,
                     )
@@ -293,19 +368,19 @@ fun SettingsScreen(
                             modifier = Modifier.size(18.dp),
                         )
                         Spacer(Modifier.width(Space.sm))
-                        Text("清空本机全部骑行记录", color = palette.danger)
+                        Text(stringResource(R.string.settings_clear_all), color = palette.danger)
                     }
                 }
 
                 // ---- 关于 ----
-                Section(icon = Icons.Outlined.Info, title = "关于") {
+                Section(icon = Icons.Outlined.Info, title = stringResource(R.string.settings_section_about)) {
                     Text(
-                        "智能骑行 SmartCycling · 1.1.0",
+                        stringResource(R.string.settings_about_version, BuildConfig.VERSION_NAME),
                         style = MaterialTheme.typography.body,
                         color = palette.textPrimary,
                     )
                     Text(
-                        "在线底图与路线规划由高德提供;离线底图由 osmdroid 渲染(Apache-2.0)。",
+                        stringResource(R.string.settings_about_credits),
                         style = MaterialTheme.typography.caption,
                         color = palette.textTertiary,
                     )
@@ -321,16 +396,16 @@ fun SettingsScreen(
             containerColor = palette.surface,
             titleContentColor = palette.textPrimary,
             textContentColor = palette.textSecondary,
-            title = { Text("清空全部记录?", style = MaterialTheme.typography.title) },
-            text = { Text("将删除本机所有骑行记录与轨迹点,操作不可撤销。", style = MaterialTheme.typography.body) },
+            title = { Text(stringResource(R.string.settings_clear_confirm_title), style = MaterialTheme.typography.title) },
+            text = { Text(stringResource(R.string.settings_clear_confirm_text), style = MaterialTheme.typography.body) },
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.clearAllRides()
                     showClearConfirm = false
-                }) { Text("清空", color = palette.danger, fontWeight = FontWeight.SemiBold) }
+                }) { Text(stringResource(R.string.action_clear), color = palette.danger, fontWeight = FontWeight.SemiBold) }
             },
             dismissButton = {
-                TextButton(onClick = { showClearConfirm = false }) { Text("取消", color = palette.primary) }
+                TextButton(onClick = { showClearConfirm = false }) { Text(stringResource(R.string.action_cancel), color = palette.primary) }
             },
         )
     }
@@ -344,11 +419,11 @@ fun SettingsScreen(
     }
     if (showThemeDialog) {
         PickerDialog(
-            title = "主题模式",
+            title = stringResource(R.string.settings_theme_mode),
             options = listOf(
-                ThemeMode.SYSTEM to "跟随系统",
-                ThemeMode.LIGHT to "浅色",
-                ThemeMode.DARK to "深色",
+                ThemeMode.SYSTEM to stringResource(R.string.theme_system),
+                ThemeMode.LIGHT to stringResource(R.string.theme_light),
+                ThemeMode.DARK to stringResource(R.string.theme_dark),
             ),
             current = themeMode,
             onSelect = { viewModel.updateThemeMode(it); showThemeDialog = false },
@@ -488,8 +563,8 @@ private fun WheelPickDialog(
         containerColor = palette.surface,
         titleContentColor = palette.textPrimary,
         textContentColor = palette.textSecondary,
-        confirmButton = { TextButton(onClick = onDismiss) { Text("完成", color = palette.primary) } },
-        title = { Text("车轮周长标定", style = MaterialTheme.typography.title) },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_done), color = palette.primary) } },
+        title = { Text(stringResource(R.string.settings_wheel_dialog_title), style = MaterialTheme.typography.title) },
         text = {
             Column(Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState())) {
                 WheelPreset.entries.forEach { p ->
@@ -505,7 +580,7 @@ private fun WheelPickDialog(
                         Column {
                             Text(p.label, style = MaterialTheme.typography.body, color = palette.textPrimary)
                             Text(
-                                "${p.circumferenceMm} mm",
+                                stringResource(R.string.settings_wheel_mm, p.circumferenceMm),
                                 style = MaterialTheme.typography.caption,
                                 color = palette.textTertiary,
                             )
@@ -532,7 +607,7 @@ private fun <T> PickerDialog(
         containerColor = palette.surface,
         titleContentColor = palette.textPrimary,
         textContentColor = palette.textSecondary,
-        confirmButton = { TextButton(onClick = onDismiss) { Text("取消", color = palette.primary) } },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel), color = palette.primary) } },
         title = { Text(title, style = MaterialTheme.typography.title) },
         text = {
             Column {

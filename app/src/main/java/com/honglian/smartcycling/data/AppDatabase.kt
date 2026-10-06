@@ -9,7 +9,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [RideEntity::class, TrackPointEntity::class, OfflineMapEntity::class],
-    version = 4,
+    version = 5,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -78,6 +78,22 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v4 → v5:新增分圈与逐点心率。
+         *
+         * - `rides.lapDistanceM`:本次骑行用的自动分圈距离(0 = 未开启),让分圈可重算。
+         * - `track_points.heartRateBpm`:逐点心率,是"分圈心率"的前提。
+         *
+         * 两列均为 `NOT NULL DEFAULT 0`,与实体上的 `@ColumnInfo(defaultValue = "0")` 严格对应。
+         * 历史记录两列都取默认 0 → 表现为"没有分圈、没有心率",UI 自动降级,不会报错。
+         */
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE rides ADD COLUMN lapDistanceM REAL NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE track_points ADD COLUMN heartRateBpm INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         @Volatile
         private var instance: AppDatabase? = null
 
@@ -88,7 +104,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "smart_cycling.db",
                 )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 // 兜底:未来若再忘记写迁移,至少不会因 schema 不匹配而直接崩溃。
                 .fallbackToDestructiveMigration()
                 .build().also { instance = it }

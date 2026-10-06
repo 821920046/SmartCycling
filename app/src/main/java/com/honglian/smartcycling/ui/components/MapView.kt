@@ -24,6 +24,7 @@ import com.amap.api.maps.model.MarkerOptions
 import com.amap.api.maps.model.MyLocationStyle
 import com.amap.api.maps.model.Polyline
 import com.amap.api.maps.model.PolylineOptions
+import com.honglian.smartcycling.R
 
 /**
  * 高德地图视图(Compose 包装)。
@@ -107,7 +108,7 @@ fun NavigationMapView(
         // clear(true) 会一并移除已走轨迹折线,置空引用以便下一次重建。
         traveledLine.value = null
         // 目的地红色标记
-        destination?.let { aMap.addMarker(MarkerOptions().position(it).title("目的地")) }
+        destination?.let { aMap.addMarker(MarkerOptions().position(it).title(context.getString(R.string.map_marker_destination))) }
         if (routePoints.size >= 2) {
             aMap.addPolyline(
                 PolylineOptions()
@@ -136,7 +137,7 @@ fun NavigationMapView(
         val gcj = toGcj02(context, wgs)
         runCatching { myMarker.value?.remove() }
         myMarker.value = runCatching {
-            aMap.addMarker(MarkerOptions().position(gcj).title("我的位置"))
+            aMap.addMarker(MarkerOptions().position(gcj).title(context.getString(R.string.map_marker_my_location)))
         }.getOrNull()
         if (follow) runCatching { aMap.moveCamera(CameraUpdateFactory.newLatLngZoom(gcj, 17f)) }
     }
