@@ -12,8 +12,8 @@ android {
         applicationId = "com.honglian.smartcycling"
         minSdk = 26
         targetSdk = 34
-        versionCode = 8
-        versionName = "1.5.2"
+        versionCode = 9
+        versionName = "1.5.3"
         vectorDrawables { useSupportLibrary = true }
 
         // 只保留真机常用架构:去掉模拟器专用的 x86/x86_64,大幅减小高德 native 库体积。

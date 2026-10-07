@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-生成 SmartCycling(鸿联骑行)的启动图标。
+生成 SmartCycling(智能骑行)的启动图标。
 
 为什么用脚本画,而不是丢一张 PNG?
   图标是**二进制资源**,一旦没有生成过程,后续想调一个色、改一点间距就得重新找设计稿。
@@ -13,7 +13,9 @@
 
 设计要点(第一性原理):
   1. **不放文字**。启动器本来就在图标下方显示应用名;图标里的字在 48dp 下必然糊成一团。
-     旧图标把"智能骑行 / SMART CYCLING"画进图里,是它最大的问题。
+     旧图标把"智能骑行 / SMART CYCLING"画进图里 —— 名字本身没错(那确实是 app_name),
+     错在**它在这个尺寸下读不出来**,还占掉了主体图形的空间。
+     需要带字标的场合(README logo)请用 `tools/gen_logo.py`,那里的尺寸放得下字。
   2. **粗笔画、少细节**。48dp 下 1 个设计单位 = 0.44px,能表达的信息量很小。
      经验阈值:任何两条笔画之间的净空隙 **≥ 4 设计单位**(≈ 1.8px)才可能在 48dp 上分开。
   3. **自行车要"读得出"靠三个信号**:两个轮子 + 中间一个**镂空的三角形** + 鞍座/车把
@@ -148,21 +150,32 @@ class Spec:
         items = []
 
         def circle(desc, c, r, w):
-            items.append((desc, self.dist(c) + r + w / 2.0))
+            # PIL 的 outline 向内画 -> 墨迹落在 [r-w, r],最外沿就是 r
+            items.append((desc, self.dist(c) + r))
 
         def seg(desc, p1, p2, w):
-            # 点到线段的距离是凸函数,故最远点必在端点
+            # draw.line 的线宽是**居中**的;点到线段的距离是凸函数,故最远点必在端点
             items.append((desc, max(self.dist(p1), self.dist(p2)) + w / 2.0))
 
         def arc(desc, w):
             hw = w / 2.0
+            rc = self.arc_radius - hw        # 描边中心线(端点圆头补在这里)
             ax, ay = self.arc_center
             away = math.degrees(math.atan2(ay - CANVAS_CENTER[1], ax - CANVAS_CENTER[0])) % 360.0
             if self._angle_in_sweep(away):
-                items.append((desc, self.dist(self.arc_center) + self.arc_radius + hw))
+                # 弧上存在"背离画布中心"的方向 -> 最远墨迹在该处的**外沿**(半径 r)
+                items.append((desc, self.dist(self.arc_center) + self.arc_radius))
             else:
-                items.append((desc, max(self.dist(self.arc_pt(a))
-                                        for a in (self.arc_start_deg, self.arc_end_deg)) + hw))
+                # 否则最远点只可能落在:外沿的两个端点,或两个端点圆头
+                def cap_far(deg):
+                    rad = math.radians(deg)
+                    c = (self.arc_center[0] + rc * math.cos(rad),
+                         self.arc_center[1] + rc * math.sin(rad))
+                    return self.dist(c) + hw
+
+                items.append((desc, max(
+                    max(self.dist(self.arc_pt(a)) for a in (self.arc_start_deg, self.arc_end_deg)),
+                    max(cap_far(a) for a in (self.arc_start_deg, self.arc_end_deg)))))
 
         arc("速度环", self.arc_width)
         if self.arc_dots in ("end", "both"):
@@ -199,15 +212,15 @@ class Spec:
             xs.extend((x0, x1))
             ys.extend((y0, y1))
 
+        # 弧:描边向内画(见 stroke_arc),墨迹落在半径 [r-w, r] 的环带里,
+        # 端点圆头也补在同一条中心线上 -> 极值就是**半径 r 上的路径点**,不需要再外扩
         for a in self._arc_key_angles():
             px, py = self.arc_pt(a)
-            h = self.arc_width / 2.0
-            add(px - h, py - h, px + h, py + h)
+            add(px, py, px, py)
 
-        for desc, c, r, w in (("", self.rear_hub, self.wheel_r, self.wheel_w),
-                              ("", self.front_hub, self.wheel_r, self.wheel_w)):
-            add(c[0] - r - w / 2.0, c[1] - r - w / 2.0,
-                c[0] + r + w / 2.0, c[1] + r + w / 2.0)
+        for c in (self.rear_hub, self.front_hub):
+            add(c[0] - self.wheel_r, c[1] - self.wheel_r,
+                c[0] + self.wheel_r, c[1] + self.wheel_r)
 
         for p1, p2, w in (
                 (self.seat_cluster, self.rear_hub, self.frame_w),
@@ -315,11 +328,19 @@ def stroke_line(draw, p1, p2, w, fill):
 
 
 def stroke_arc(draw, cx, cy, r, start, end, w, fill):
-    """PIL 的 arc 不支持圆头端点,故手动补两个端点圆。"""
+    """
+    PIL 的 arc 不支持圆头端点,故手动补两个端点圆。
+
+    **必须注意**:PIL 的 outline 是**向内**画的 —— bbox 半径 r、线宽 w 时,
+    墨迹实际落在半径 [r-w, r](实测验证过)。
+    所以端点圆要补在**描边中心线 r - w/2** 上,而不是路径半径 r 上;
+    补在 r 上会让圆头向外鼓出 w/2,在弧的两端各形成一个小球。
+    """
     draw.arc([cx - r, cy - r, cx + r, cy + r], start=start, end=end,
              fill=fill, width=max(1, int(round(w))))
-    _cap(draw, _pt(cx, cy, r, start), w, fill)
-    _cap(draw, _pt(cx, cy, r, end), w, fill)
+    rc = r - w / 2.0
+    _cap(draw, _pt(cx, cy, rc, start), w, fill)
+    _cap(draw, _pt(cx, cy, rc, end), w, fill)
 
 
 def stroke_circle(draw, cx, cy, r, w, fill):
