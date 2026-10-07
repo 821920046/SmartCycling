@@ -13,3 +13,6 @@ local.properties
 # 注意:app/keystore/smartcycling.keystore 需要提交(固定签名,供高德 Key 使用),故不忽略
 # AI 助手本地工作区(记忆/日志),不属于项目产物
 .workbuddy-ai/
+
+# 本地从 CI 取回的产物(APK / 单元测试报告),不属于项目产物
+/dist

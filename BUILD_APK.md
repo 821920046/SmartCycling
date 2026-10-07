@@ -20,9 +20,24 @@
      git push -u origin main
      ```
 3. 推送后打开仓库的 **Actions** 页,等 `Build APK` 跑完(约 3–5 分钟)。
-4. 进入这次运行,在页面底部 **Artifacts** 下载 `smart-cycling-release-apk`,
-   解压即 `app-release.apk`。
-5. 传到手机,允许“安装未知来源应用”,点击安装。
+4. 进入这次运行,在页面底部 **Artifacts** 下载 `smart-cycling-release-apk`。
+5. **⚠️ 这一步最容易踩坑:下载到的是一层 ZIP,不是 APK。**
+   GitHub Actions 的 Artifact **永远**是 ZIP 打包的(哪怕里面只有一个文件)。
+   所以必须**先解压**,取出里面的 `app-release.apk`,再把这个 `.apk` 传到手机安装。
+   直接把 ZIP 传到手机点安装,安卓只会报"解析包时出现问题"。
+
+   > 命令行取原始 APK(不解压 ZIP,直接拿到文件):
+   > ```bash
+   > gh run download <run-id> -n smart-cycling-release-apk -D dist
+   > # dist/app-release.apk 就是可直接安装的安装包
+   > ```
+6. 传到手机,允许“安装未知来源应用”,点击安装。
+
+> **安装前置条件(不满足会装不上,且报错文案很含糊)**
+> - **系统需 Android 8.0 及以上**(`minSdk 26`)。低于 8.0 会报"解析软件包时出现问题"。
+> - APK 只打包了 `arm64-v8a` 与 `armeabi-v7a` 两种架构(真机常见架构都覆盖)。
+> - 签名采用 **APK Signature Scheme v2/v3**(不是 v1/JAR 签名),
+>   Android 7.0+ 原生支持,正常可装。
 
 > 云端运行时才会联网下载 Compose / Nordic BLE / Room 等依赖,你本地无需任何环境。
 >
@@ -68,3 +83,25 @@ gradle wrapper --gradle-version 8.9   # 首次生成 wrapper
 - 地图为**双引擎**:在线底图走高德(路径规划 / POI / 语音),离线底图走 osmdroid 渲染
   本地瓦片包(MBTiles / ZIP / 瓦片文件夹 / GeoPackage)。未配置高德 Key 时在线部分不可用,
   需在构建时通过 `-PAMAP_KEY=xxx` 注入。
+
+---
+
+## 装不上怎么办(按可能性排序)
+
+| 现象 | 原因 | 解决 |
+|---|---|---|
+| 提示"解析包时出现问题" / "解析软件包时出现问题" | **装的是 ZIP 而不是 APK** | 先解压,取出里面的 `app-release.apk` 再装 |
+| 同上 | **手机系统低于 Android 8.0**(`minSdk 26`) | 换 Android 8.0+ 的设备;或改 `minSdk` 重新构建 |
+| 提示"已阻止安装未知应用" | 未授权来源 | 设置 → 应用 → 对应文件管理器/浏览器 → 允许"安装未知应用" |
+| 安装到一半失败 / 提示"应用未安装" | 手机上已装**不同签名**的同包名应用 | 先卸载旧的 `com.honglian.smartcycling` 再装(换签名后无法覆盖安装) |
+| 传输后无法安装 | 文件传输被截断(APK 约 98 MB) | 校验大小与完整性:`unzip -t app-release.apk` 应输出 `No errors detected` |
+| 装上了但地图空白 | 未注入高德 Key | 构建时传 `-PAMAP_KEY=xxx`;或改用离线瓦片包 |
+
+**用 adb 安装并看到真实报错**(比手机上的含糊提示有用得多):
+
+```bash
+adb install -r app-release.apk
+# 失败时会直接给出原因,例如 INSTALL_FAILED_OLDER_SDK(系统版本过低)
+#                                   INSTALL_FAILED_UPDATE_INCOMPATIBLE(签名冲突)
+```
+
