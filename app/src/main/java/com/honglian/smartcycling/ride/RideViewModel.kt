@@ -90,6 +90,19 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
     private var elevationGain = 0.0
     private var caloriesKcal = 0.0
     private var lastAltitude: Double? = null
+
+    /**
+     * 实时海拔的**显示值**(已做 EMA 滤波);null = 尚无有效高程读数。
+     *
+     * 与 [lastAltitude] 刻意分开:[lastAltitude] 是累计爬升的原始基准,
+     * 一旦把它换成滤波值,已落库的 elevationGainM 口径就变了 —— 那属于数据口径变更,
+     * 不是显示优化。所以只平滑"给人看的那一个数"。
+     */
+    private var currentAltitude: Double? = null
+
+    /** 水柱量程下限;首个有效高程读数到达时锁定一次,整段骑行不变。 */
+    private var altitudeBase: Double? = null
+
     private var autoPauseEnabled = true
     private var autoPauseThresholdKmh = 1.5
     private var riderWeightKg = 65.0
@@ -173,6 +186,8 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
         elevationGain = 0.0
         caloriesKcal = 0.0
         lastAltitude = null
+        currentAltitude = null
+        altitudeBase = null
         heartRateBpm = 0
         lastHrAt = 0L
         hrSum = 0L
@@ -248,6 +263,16 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
                 val prevAlt = lastAltitude
                 if (prevAlt != null && alt - prevAlt >= 0.5) elevationGain += (alt - prevAlt)
                 lastAltitude = alt
+                // 实时海拔单独做 EMA:GPS 高程噪声普遍 ±10m 以上,直接显示会让水柱每秒乱颤。
+                // 这里只滤"显示值",上面的累计爬升仍走原始值,不改变已落库口径。
+                val prevDisplay = currentAltitude
+                currentAltitude = if (prevDisplay == null) {
+                    alt
+                } else {
+                    ALT_EMA_ALPHA * alt + (1.0 - ALT_EMA_ALPHA) * prevDisplay
+                }
+                // 量程下限只锁一次:若随"刷新最低海拔"下移,水面会在每次刷新时莫名往上跳。
+                if (altitudeBase == null) altitudeBase = AltitudeGauge.base(alt)
             }
             // 逐点心率:分圈心率的前提(轨迹点没有心率,分圈就只能给整段平均值)。
             val hrNow = if (lastHrAt > 0L && System.currentTimeMillis() - lastHrAt < HR_STALE_MS) heartRateBpm else 0
@@ -280,6 +305,29 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun hasFreshGps() = System.currentTimeMillis() - lastGpsAt < STALE_MS
+
+    /**
+     * 近 [TREND_WINDOW_MS] 的海拔趋势:1 上升 / -1 下降 / 0 持平。
+     *
+     * 直接复用已落库的轨迹点(它们本就带时间戳与原始高程),不再单独维护一份历史 ——
+     * 轨迹点上限 8000,从尾部反向扫到第一个"够老"的点即可,开销可忽略。
+     * 数据不足(刚出发)或拿不到参考点时返回 0,界面显示"持平",不猜。
+     */
+    private fun altitudeTrend(nowMs: Long): Int {
+        val cur = currentAltitude ?: return 0
+        val ref = trackPoints.asReversed()
+            .firstOrNull { nowMs - it.timestampMs >= TREND_WINDOW_MS }
+            ?.elevationM
+            ?: return 0
+        // 轨迹点用 0.0 表示"当时没有高程读数",这种参考点不能用。
+        if (ref == 0.0) return 0
+        val delta = cur - ref
+        return when {
+            delta >= TREND_EPS_M -> 1
+            delta <= -TREND_EPS_M -> -1
+            else -> 0
+        }
+    }
 
     /** 按骑行速度估算 MET(代谢当量),用于卡路里估算。 */
     private fun metForSpeed(kmh: Double): Double = when {
@@ -365,6 +413,9 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
                 speedSource = if (useSensor) SpeedSource.SENSOR_WHEEL else SpeedSource.GPS,
                 calories = caloriesKcal,
                 elevationGainM = elevationGain,
+                currentAltitudeM = currentAltitude,
+                altitudeBaseM = altitudeBase,
+                altitudeTrend = altitudeTrend(now),
                 heartRateBpm = curHr,
                 avgHeartRateBpm = avgHr,
                 maxHeartRateBpm = maxHeartRate,
@@ -492,6 +543,12 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
             lastGpsSpeed = 0.0
             lastGpsAt = 0L
             lastAltitude = points.lastOrNull()?.elevationM?.takeIf { it != 0.0 }
+            // 续骑时水柱量程也必须还原:否则水面会从"新起点"重新算,与已骑的爬升对不上。
+            // 下限用**已落盘轨迹里的最低海拔**近似原始起点 —— 比拿当前海拔当起点更接近事实
+            // (当前海拔可能已经在半山腰,那样水面会一开局就见底)。
+            val altitudePoints = points.map { it.elevationM }.filter { it != 0.0 }
+            currentAltitude = altitudePoints.lastOrNull()
+            altitudeBase = altitudePoints.minOrNull()?.let { AltitudeGauge.base(it) }
             lastActiveAt = System.currentTimeMillis()
 
             trackPoints.clear()
@@ -511,6 +568,8 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
                 maxSpeedKmh = ride.maxSpeedKmh,
                 calories = ride.calories,
                 elevationGainM = ride.elevationGainM,
+                currentAltitudeM = currentAltitude,
+                altitudeBaseM = altitudeBase,
                 avgHeartRateBpm = ride.avgHeartRateBpm,
                 maxHeartRateBpm = ride.maxHeartRateBpm,
                 autoLapEnabled = lapDistanceM > 0.0,
@@ -594,5 +653,19 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
         private const val HR_STALE_MS = 5000L
         /** 断点续记的落盘周期。10 秒 = 最坏情况丢 10 秒数据,而写入开销可忽略。 */
         private const val PERSIST_INTERVAL_MS = 10_000L
+
+        /**
+         * 实时海拔的显示滤波系数(EMA 中"新值"的权重)。
+         *
+         * GPS 高程噪声普遍 ±10m 以上,1Hz 采样下直接显示会让水柱每秒乱颤。
+         * 0.25 对应约 4 秒时间常数:肉眼跟得上真实爬升,又不会被噪声牵着走。
+         */
+        private const val ALT_EMA_ALPHA = 0.25
+
+        /** 海拔趋势的比较窗口(毫秒)。太短会被噪声主导,太长则反应迟钝。 */
+        private const val TREND_WINDOW_MS = 15_000L
+
+        /** 判定"在上升/下降"的最小海拔变化(米),低于它视为持平。 */
+        private const val TREND_EPS_M = 3.0
     }
 }

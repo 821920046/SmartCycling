@@ -19,6 +19,24 @@ data class RideState(
     val speedSource: SpeedSource = SpeedSource.GPS,
     val calories: Double = 0.0,
     val elevationGainM: Double = 0.0,
+    /**
+     * 实时海拔(米,已做显示滤波);null = 尚无有效高程读数。
+     *
+     * 与 [elevationGainM](累计爬升)是**两个不同的量**:这里是"此刻所处的高度",
+     * 那个是"一路上净爬了多少"。界面上必须用不同的标签,不能互相顶替。
+     *
+     * 用可空类型而不是 0.0 哨兵:"海拔 0 米"是合法读数(海平面、荷兰、部分沿海路段),
+     * 若拿 0 表示"未知",两者就再也分不开了 —— 而 GPS 恰好用 0.0 表示"没有高程"。
+     */
+    val currentAltitudeM: Double? = null,
+    /**
+     * 水柱量程下限(绝对海拔,米);null = 尚未确定量程(还没拿到第一个高程读数)。
+     *
+     * 由 [AltitudeGauge.base] 在骑行开始时一次锁定,整段骑行不变。
+     */
+    val altitudeBaseM: Double? = null,
+    /** 海拔趋势:1 上升 / -1 下降 / 0 基本持平(约 15 秒窗口)。 */
+    val altitudeTrend: Int = 0,
     /** 实时心率(bpm);未连接心率带或数据过期时为 0。 */
     val heartRateBpm: Int = 0,
     /** 本次骑行平均心率(bpm);无心率数据时为 0。 */

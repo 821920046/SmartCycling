@@ -136,6 +136,12 @@
     <string name="ride_stat_avg_cadence">平均踏频</string>
     <string name="ride_stat_cadence">踏频</string>
     <string name="ride_stat_live_hr">实时心率</string>
+
+    <!-- 实时海拔水柱 -->
+    <string name="altitude_title">海拔</string>
+    <string name="altitude_trend_up">爬升中</string>
+    <string name="altitude_trend_down">下坡中</string>
+    <string name="altitude_trend_flat">持平</string>
     <string name="ride_status_auto_paused">⏱ 自动暂停中</string>
     <string name="ride_status_cadence">踏频 · 实时 rpm</string>
     <string name="ride_status_sensor">速度来源 · 传感器</string>

@@ -30,6 +30,7 @@ import com.honglian.smartcycling.R
 import com.honglian.smartcycling.ride.RideState
 import com.honglian.smartcycling.ride.SensorMode
 import com.honglian.smartcycling.ride.SpeedSource
+import com.honglian.smartcycling.ui.components.AltitudeColumn
 import com.honglian.smartcycling.ui.components.DataGrid
 import com.honglian.smartcycling.ui.components.NaviBannerInfo
 import com.honglian.smartcycling.ui.components.NaviVoiceGuide
@@ -169,6 +170,18 @@ fun RideScreen(
                     onUnlock = { locked = false },
                 )
             }
+            // 实时海拔水柱:固定锚在左上角,刻意**不**参与仪表盘的拖动/缩放 ——
+            // 它是"一眼扫过"的仪表,被用户误拖到屏幕外就失去意义了。
+            // top 取 80dp:竖屏时转向卡几乎横贯整屏(高约 62dp + 上边距 10dp),
+            // 这个值给它留出 8dp 净空,同时避开左上角的语音开关。
+            AltitudeColumn(
+                state = state,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .safeDrawingPadding()
+                    .padding(top = 80.dp, start = 8.dp)
+                    .zIndex(6f),
+            )
             if (locked) {
                 Box(Modifier.fillMaxSize().zIndex(7f).pointerInput(Unit) { detectTapGestures { } })
             }
@@ -350,6 +363,16 @@ fun RideScreen(
                     fontWeight = FontWeight.Bold,
                 )
             }
+
+            // 实时海拔水柱:横屏同样锚左上角(右侧是仪表盘、右下是控制按钮、左下是锁屏按钮)。
+            AltitudeColumn(
+                state = state,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .safeDrawingPadding()
+                    .padding(top = 80.dp, start = 8.dp)
+                    .zIndex(6f),
+            )
 
             if (locked) {
                 Box(
