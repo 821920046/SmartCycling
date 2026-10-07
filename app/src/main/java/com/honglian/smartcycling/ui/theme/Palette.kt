@@ -81,9 +81,20 @@ private val LightPalette = AppPalette(
     success = Color(0xFF0B7A3D),
     warning = Color(0xFF9C5D00),
     danger = Color(0xFFC93034),
+    // 三级文字:**全部按正文标准 >= 4.5:1 校验**,因为它们都用于真实文字
+    // (设置项副标题、历史记录日期、离线地图说明、配对提示、单位后缀……),
+    // 且多为 11sp 的 caption —— 字号越小越吃对比度。
+    //
+    // 原值(textTertiary 在浅灰底 #EBEFF4 上取最差):
+    //   textSecondary #5B6875 = 4.94:1  达标
+    //   textTertiary  #8B96A3 = 2.60:1  严重不达标(~40 处真实文字)
+    // 但只把 tertiary 压深会与 secondary 撞色、三级层次塌成两级,
+    // 因此**同时压深 secondary**,既达标又保住层次:
+    //   textSecondary #4A5561 = 6.58:1
+    //   textTertiary  #5F6B78 = 4.71:1
     textPrimary = Color(0xFF111827),
-    textSecondary = Color(0xFF5B6875),
-    textTertiary = Color(0xFF8B96A3),
+    textSecondary = Color(0xFF4A5561),
+    textTertiary = Color(0xFF5F6B78),
     scrim = Color(0x66000000),
     glassSurface = Color(0xF2FFFFFF),
     floatingSurface = Color(0xF7FFFFFF),
@@ -105,9 +116,12 @@ private val DarkPalette = AppPalette(
     success = Color(0xFF35D07F),
     warning = Color(0xFFFFB020),
     danger = Color(0xFFFF5A5F),
+    // 同上:textTertiary 原值 #6E7B89 在 #1C242E 上仅 3.62:1,不达标;
+    // 提亮为 #8593A1(4.98:1)。textSecondary #A6B2C0 本就 7.27:1,不动 ——
+    // 这样暗色的三级层次(14.45 / 7.27 / 4.98)依然清晰。
     textPrimary = Color(0xFFF3F6FA),
     textSecondary = Color(0xFFA6B2C0),
-    textTertiary = Color(0xFF6E7B89),
+    textTertiary = Color(0xFF8593A1),
     scrim = Color(0x99000000),
     glassSurface = Color(0xE6141A21),
     floatingSurface = Color(0xF0141A21),
