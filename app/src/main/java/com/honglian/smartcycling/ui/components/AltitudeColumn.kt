@@ -77,7 +77,9 @@ fun AltitudeColumn(state: RideState, modifier: Modifier = Modifier) {
     val baseM = state.altitudeBaseM
 
     val window = if (altitudeM != null && baseM != null) {
-        AltitudeGauge.window(baseM, altitudeM)
+        // 跨度直接取状态里累积好的值(只增不减),**不要**在这里用当前海拔现算 ——
+        // 那样起伏路线上每次跨过量程上限都会重新换挡一次。原因见 AltitudeGauge 的类文档。
+        AltitudeGauge.Window(baseM, state.altitudeSpanM)
     } else {
         null
     }

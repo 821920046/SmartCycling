@@ -103,6 +103,9 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
     /** 水柱量程下限;首个有效高程读数到达时锁定一次,整段骑行不变。 */
     private var altitudeBase: Double? = null
 
+    /** 水柱量程跨度;只增不减(见 [AltitudeGauge.growSpanM] 的说明)。 */
+    private var altitudeSpan = AltitudeGauge.INITIAL_SPAN_M
+
     private var autoPauseEnabled = true
     private var autoPauseThresholdKmh = 1.5
     private var riderWeightKg = 65.0
@@ -188,6 +191,7 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
         lastAltitude = null
         currentAltitude = null
         altitudeBase = null
+        altitudeSpan = AltitudeGauge.INITIAL_SPAN_M
         heartRateBpm = 0
         lastHrAt = 0L
         hrSum = 0L
@@ -272,7 +276,10 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
                     ALT_EMA_ALPHA * alt + (1.0 - ALT_EMA_ALPHA) * prevDisplay
                 }
                 // 量程下限只锁一次:若随"刷新最低海拔"下移,水面会在每次刷新时莫名往上跳。
-                if (altitudeBase == null) altitudeBase = AltitudeGauge.base(alt)
+                val base = altitudeBase ?: AltitudeGauge.base(alt)
+                altitudeBase = base
+                // 跨度只增不减:否则起伏路线上每跨过一次上限都会重新换挡,水面反复掉回半程。
+                altitudeSpan = AltitudeGauge.growSpanM(altitudeSpan, base, alt)
             }
             // 逐点心率:分圈心率的前提(轨迹点没有心率,分圈就只能给整段平均值)。
             val hrNow = if (lastHrAt > 0L && System.currentTimeMillis() - lastHrAt < HR_STALE_MS) heartRateBpm else 0
@@ -415,6 +422,7 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
                 elevationGainM = elevationGain,
                 currentAltitudeM = currentAltitude,
                 altitudeBaseM = altitudeBase,
+                altitudeSpanM = altitudeSpan,
                 altitudeTrend = altitudeTrend(now),
                 heartRateBpm = curHr,
                 avgHeartRateBpm = avgHr,
@@ -548,7 +556,16 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
             // (当前海拔可能已经在半山腰,那样水面会一开局就见底)。
             val altitudePoints = points.map { it.elevationM }.filter { it != 0.0 }
             currentAltitude = altitudePoints.lastOrNull()
-            altitudeBase = altitudePoints.minOrNull()?.let { AltitudeGauge.base(it) }
+            val resumeBase = altitudePoints.minOrNull()?.let { AltitudeGauge.base(it) }
+            altitudeBase = resumeBase
+            // 跨度也要按"已骑过的最高海拔"推出来,否则续骑后水面会从零重新涨一遍,
+            // 与已经骑出来的爬升对不上。
+            val resumeMax = altitudePoints.maxOrNull()
+            altitudeSpan = if (resumeBase != null && resumeMax != null) {
+                AltitudeGauge.growSpanM(AltitudeGauge.INITIAL_SPAN_M, resumeBase, resumeMax)
+            } else {
+                AltitudeGauge.INITIAL_SPAN_M
+            }
             lastActiveAt = System.currentTimeMillis()
 
             trackPoints.clear()
@@ -570,6 +587,7 @@ class RideViewModel(app: Application) : AndroidViewModel(app) {
                 elevationGainM = ride.elevationGainM,
                 currentAltitudeM = currentAltitude,
                 altitudeBaseM = altitudeBase,
+                altitudeSpanM = altitudeSpan,
                 avgHeartRateBpm = ride.avgHeartRateBpm,
                 maxHeartRateBpm = ride.maxHeartRateBpm,
                 autoLapEnabled = lapDistanceM > 0.0,

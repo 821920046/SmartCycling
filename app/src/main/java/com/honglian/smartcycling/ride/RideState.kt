@@ -35,6 +35,13 @@ data class RideState(
      * 由 [AltitudeGauge.base] 在骑行开始时一次锁定,整段骑行不变。
      */
     val altitudeBaseM: Double? = null,
+    /**
+     * 水柱量程跨度(米)。由 [AltitudeGauge.growSpanM] 累积,**只会变大、不会缩小**。
+     *
+     * 为什么必须"粘住":若跨度只按当前海拔算,起伏路线上每次跨过量程上限都会重新换挡一次,
+     * 水面反复从满格掉回半程,还会出现"海拔在涨、水面却在落"的假象。
+     */
+    val altitudeSpanM: Double = AltitudeGauge.INITIAL_SPAN_M,
     /** 海拔趋势:1 上升 / -1 下降 / 0 基本持平(约 15 秒窗口)。 */
     val altitudeTrend: Int = 0,
     /** 实时心率(bpm);未连接心率带或数据过期时为 0。 */
