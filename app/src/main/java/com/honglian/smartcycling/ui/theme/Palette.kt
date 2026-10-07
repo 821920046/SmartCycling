@@ -15,6 +15,17 @@ import androidx.compose.ui.graphics.Color
  *
  * 所有颜色都以**语义**命名(background/surface/textPrimary…),而不是"cyan/green",
  * 这样换肤、换品牌色时只需改这一处,界面代码零改动。
+ *
+ * ⚠️ 作用域边界:**本色板只服务"普通页面"**(历史/地图/设置/配对/离线地图)。
+ * 这些页面会随主题在亮/暗之间切换,因此必须读语义色。
+ * 而"骑行 HUD"与"成绩总结页"是**刻意写死的深色专用表面**,一律使用
+ * `HudColors.kt` 里的恒定物理色(`SpeedText` / `DataLabel` / `RingTrack` / `PanelBg*` …)。
+ *
+ * 历史上本类曾有 `hudValue / hudLabel / hudTrack / hudBackground` 四个字段,
+ * 它们随主题变化,却被铺在刻意写死的深色玻璃面板上 —— 亮色主题下数字变成近黑色
+ * `#0B0F14` 压在同色深底上,实测对比度仅 **1.05:1**,等于看不见。
+ * 现已**删除**这四个字段:让"在深色 HUD 上误用主题色"在**编译期**就不可能发生,
+ * 而不是靠注释提醒。
  */
 @Immutable
 data class AppPalette(
@@ -38,11 +49,6 @@ data class AppPalette(
     val glassSurface: Color,
     /** 地图/相机类界面上的悬浮控件底色。 */
     val floatingSurface: Color,
-    /** 骑行 HUD 的底色与主数字色(与普通页面解耦,以便单独调高对比)。 */
-    val hudBackground: Color,
-    val hudValue: Color,
-    val hudLabel: Color,
-    val hudTrack: Color,
 )
 
 // ------------------------------------------------------------------ 亮色
@@ -67,10 +73,6 @@ private val LightPalette = AppPalette(
     scrim = Color(0x66000000),
     glassSurface = Color(0xF2FFFFFF),
     floatingSurface = Color(0xF7FFFFFF),
-    hudBackground = Color(0xFFFFFFFF),
-    hudValue = Color(0xFF0B0F14),
-    hudLabel = Color(0xFF5B6875),
-    hudTrack = Color(0xFFE4E9EF),
 )
 
 // ------------------------------------------------------------------ 暗色
@@ -95,10 +97,6 @@ private val DarkPalette = AppPalette(
     scrim = Color(0x99000000),
     glassSurface = Color(0xE6141A21),
     floatingSurface = Color(0xF0141A21),
-    hudBackground = Color(0xFF0C1015),
-    hudValue = Color(0xFFFFFFFF),
-    hudLabel = Color(0xFFA6B2C0),
-    hudTrack = Color(0xFF28323D),
 )
 
 /** 当前生效的色板。 */

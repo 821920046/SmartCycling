@@ -339,13 +339,17 @@ fun RideScreen(
                 )
             }
 
-            // 锁屏防误触按钮（左下角）：点按锁定，长按解锁
+            // 锁屏防误触按钮（左下角）：点按锁定，长按解锁。
+            // 触控目标:横屏这里原先靠 padding 撑高(14sp 文字 + 上下 14dp ≈ 45dp),
+            // 低于 Material 无障碍下限 48dp;改为显式 heightIn(min = 48.dp) + 居中。
+            // (竖屏那个本来就用 .height(buttonHeight),已是 48/52dp,无需改动。)
             Box(
                 Modifier
                     .align(Alignment.BottomStart)
                     .safeDrawingPadding()
                     .padding(16.dp)
                     .zIndex(7f)
+                    .heightIn(min = 48.dp)
                     .background(if (locked) StopRed else Color(0xAA0B1622), RoundedCornerShape(14.dp))
                     .border(1.dp, BrandCyan.copy(alpha = 0.4f), RoundedCornerShape(14.dp))
                     .pointerInput(Unit) {
@@ -354,7 +358,8 @@ fun RideScreen(
                             onLongPress = { if (locked) locked = false },
                         )
                     }
-                    .padding(horizontal = 18.dp, vertical = 14.dp),
+                    .padding(horizontal = 18.dp),
+                contentAlignment = Alignment.Center,
             ) {
                 Text(
                     stringResource(if (locked) R.string.ride_locked else R.string.ride_lock),
@@ -385,7 +390,16 @@ fun RideScreen(
         }
     }
 
-    // 误触确认对话框（横竖屏共用）
+    // 误触确认对话框（横竖屏共用）。
+    //
+    // ⚠️ 配色契约:本弹窗**保持深色**,与骑行 HUD 同族 —— 它浮在"全屏地图 + 深色玻璃
+    // 仪表盘"之上,四周全是深色面板,弹一个浅色框反而割裂。
+    // 注意这与 [com.honglian.smartcycling.ui.screens.OnboardingDialog] /
+    // [com.honglian.smartcycling.ui.screens.RideRecoveryDialog] 相反:那两个是**应用级**
+    // 弹窗,浮在已主题化的地图页上,必须跟随主题。
+    // 判定准则:弹窗浮在"刻意写死的深色表面"上 → 深色;浮在"跟随主题的页面"上 → 跟随主题。
+    // 由于本弹窗内部全部使用恒定物理色(白/霓虹青/红压在不透明深蓝上),
+    // 两种主题下对比度一致,不存在可读性风险。
     if (showStopConfirm) {
         AlertDialog(
             onDismissRequest = { showStopConfirm = false },
@@ -557,50 +571,6 @@ private fun StatusPill(text: String, paused: Boolean) {
             .padding(horizontal = 12.dp, vertical = 5.dp),
     ) {
         Text(text, fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.ExtraBold)
-    }
-}
-
-/** Hero 关键指标:图标 + 大数值 + 标签(单行)。 */
-@Composable
-private fun HeroStat(icon: String, label: String, value: String, accent: Color) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(icon, fontSize = 18.sp)
-        Text(value, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = accent)
-        Text(label, fontSize = 12.sp, color = DataLabel, fontWeight = FontWeight.Medium)
-    }
-}
-
-/** 指标卡片:左侧强调色条 + 标签 + 大数值 + 单位。 */
-@Composable
-private fun StatChip(
-    modifier: Modifier,
-    label: String,
-    value: String,
-    unit: String,
-    accent: Color,
-    highContrast: Boolean,
-) {
-    Row(
-        modifier
-            .height(62.dp)
-            .background(if (highContrast) Color(0x33FFFFFF) else Color(0x14FFFFFF), RoundedCornerShape(16.dp))
-            .border(1.dp, GlassBorder, RoundedCornerShape(16.dp)),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            Modifier
-                .padding(start = 10.dp)
-                .width(4.dp)
-                .height(34.dp)
-                .background(accent, RoundedCornerShape(2.dp)),
-        )
-        Column(Modifier.padding(horizontal = 12.dp)) {
-            Text(label, fontSize = 11.sp, color = DataLabel, fontWeight = FontWeight.Medium)
-            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(value, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = SpeedText)
-                Text(unit, fontSize = 11.sp, color = DataLabel, modifier = Modifier.padding(bottom = 3.dp))
-            }
-        }
     }
 }
 

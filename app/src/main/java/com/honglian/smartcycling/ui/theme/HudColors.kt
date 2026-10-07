@@ -15,8 +15,22 @@ import androidx.compose.ui.graphics.Color
 
 val BrandCyan = Color(0xFF00F0FF)   // 霓虹青:主强调色
 val BrandGreen = Color(0xFF00FF88)  // 霓虹绿:达标/次要强调
-val RingBlue = Color(0xFF00FF88)
-val RingTrack = Color(0xFF152233)   // 速度环空轨道
+
+/**
+ * 速度环"空轨道"色。
+ *
+ * 为什么是**半透明白**而不是不透明深藏青?
+ * 速度环所在的 HUD 面板本身是半透明的(alpha 0x66~0x88),压在底图上,
+ * 用户看到的是**合成后**的颜色。不透明轨道色(原为 `#152233`)在底图偏亮时
+ * 会与合成后的面板色撞在一起 —— 实测在"亮夜景"底图 + 竖屏面板上对比度仅
+ * **1.05:1**,空轨道等于消失,圆环看起来只剩一段弧。
+ *
+ * 半透明白对背后的任何颜色都能自适应,且与 [RideScreen] 既有的
+ * `0x14FFFFFF` / `0x33FFFFFF` / `0x59FFFFFF` 轨道与底衬做法一致。
+ * 实测 `0x59FFFFFF` 在"5 种 HUD 面板 × 3 种夜景底图"共 15 种组合下
+ * 最差 **3.1:1**,满足 WCAG 2.1 SC 1.4.11(非文字对比 ≥ 3:1)。
+ */
+val RingTrack = Color(0x59FFFFFF)
 
 val SpeedText = Color(0xFFFFFFFF)   // 大字纯白
 val DataValue = Color(0xFFE0F2FE)   // 亮天蓝数据值

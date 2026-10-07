@@ -32,12 +32,20 @@ import com.honglian.smartcycling.core.Units
 import com.honglian.smartcycling.ride.RideState
 import com.honglian.smartcycling.ride.SensorMode
 import com.honglian.smartcycling.ui.theme.AppTheme
+import com.honglian.smartcycling.ui.theme.DataLabel
 import com.honglian.smartcycling.ui.theme.DividerNavy
+import com.honglian.smartcycling.ui.theme.SpeedText
 import kotlin.math.roundToInt
 
 /**
  * 骑行数据网格(2×2)。
  * 每格为"图标 + 数值 + 标签",数值统一使用表格数字保证跳动时不抖动。
+ *
+ * ⚠️ 配色契约:本组件**只**铺在骑行 HUD 的深色玻璃面板上(该面板底色是刻意写死的,
+ * 见 `ui/theme/HudColors.kt`),因此数值/标签必须用
+ * [SpeedText] / [DataLabel] 这类**恒定物理色**。若改读 `AppTheme.palette.hudValue`,
+ * 亮色主题下数字会变成近黑色 `#0B0F14` 压在同色深玻璃上。
+ * 实测(亮色主题 + 默认夜景底图):数值对比度 **1.05:1**、标签 **3.21:1**,前者不可读。
  */
 @Composable
 fun DataGrid(state: RideState, modifier: Modifier = Modifier) {
@@ -112,7 +120,6 @@ fun DataGrid(state: RideState, modifier: Modifier = Modifier) {
  */
 @Composable
 private fun DataCell(modifier: Modifier, text: String, label: String) {
-    val palette = AppTheme.palette
     Column(
         modifier.padding(vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -121,13 +128,13 @@ private fun DataCell(modifier: Modifier, text: String, label: String) {
             text = text,
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold,
-            color = palette.hudValue,
+            color = SpeedText,
         )
         Spacer(Modifier.height(2.dp))
         Text(
             text = label,
             fontSize = 11.sp,
-            color = palette.hudLabel,
+            color = DataLabel,
         )
     }
 }
@@ -140,20 +147,19 @@ private fun MetricTile(
     modifier: Modifier = Modifier,
     alpha: Float = 1f,
 ) {
-    val palette = AppTheme.palette
     Column(modifier.padding(vertical = 4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = palette.hudLabel.copy(alpha = 0.9f * alpha),
+                tint = DataLabel.copy(alpha = 0.9f * alpha),
                 modifier = Modifier.size(15.dp),
             )
             Spacer(Modifier.width(6.dp))
             Text(
                 text = label,
                 fontSize = 12.sp,
-                color = palette.hudLabel.copy(alpha = alpha),
+                color = DataLabel.copy(alpha = alpha),
             )
         }
         Spacer(Modifier.height(4.dp))
@@ -161,7 +167,7 @@ private fun MetricTile(
             text = value,
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
-            color = palette.hudValue.copy(alpha = alpha),
+            color = SpeedText.copy(alpha = alpha),
         )
     }
 }

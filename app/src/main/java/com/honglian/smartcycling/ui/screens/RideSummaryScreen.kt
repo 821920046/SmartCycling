@@ -35,6 +35,17 @@ import com.honglian.smartcycling.ui.theme.*
  *
  * 单位制:所有数值经 [Units] 换算后再渲染 —— 页面本身不关心公制还是英制,
  * 只从 [AppTheme.units] 取当前偏好。
+ *
+ * ⚠️ 配色契约:本页**刻意保持深色,不跟随主题**,与骑行 HUD 同属一个视觉族。
+ * 理由:
+ *  1. 这是"刚骑完、满头汗、可能还在太阳底下"的页面,64sp 的大里程数字需要最高对比度,
+ *     深底 + 亮字是最稳的组合(与 `ui/theme/HudColors.kt` 一致);
+ *  2. 从骑行 HUD(深色)过渡到总结页(深色)视觉连续,不会突然闪白;
+ *  3. 因此这里**必须**用 `SpeedText` / `DataValue` / `DataLabel` / `PanelBg*` 等
+ *     恒定物理色,禁止读 [AppTheme.palette] 的语义色 —— 亮色主题下语义色是近黑色,
+ *     压在深底上会整页不可读。
+ * 对照:同文件里的 [OnboardingDialog] / [RideRecoveryDialog] 是**应用级弹窗**,
+ * 会浮在已主题化的页面上,所以那两个必须跟随主题。
  */
 @Composable
 fun RideSummaryScreen(
@@ -270,14 +281,18 @@ private fun lapDurationText(sec: Long): String {
 
 /**
  * 首次使用引导弹窗。简要介绍核心使用流程,确认后不再提示。
+ *
+ * ⚠️ 配色契约:本弹窗**跟随主题**,不写死深色。
+ * 它是"应用级"提示(首次启动即出现),会浮在**已主题化**的地图页之上;
+ * 若写死深色,亮色主题用户第一次打开 App 看到的就是一块突兀的黑框。
+ * 因此这里只依赖 M3 `AlertDialog` 的默认取色(由 [SmartCyclingTheme] 映射到 [AppPalette]),
+ * **不做任何颜色覆盖** —— 覆盖反而容易漏掉按钮文字,例如霓虹青 `#00F0FF`
+ * 压在白色底上对比度仅 **1.41:1**,等于看不见。
  */
 @Composable
 fun OnboardingDialog(onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = CardBg,
-        titleContentColor = SpeedText,
-        textContentColor = DataLabel,
         title = { Text(stringResource(R.string.onboarding_title), fontWeight = FontWeight.ExtraBold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -289,7 +304,7 @@ fun OnboardingDialog(onDismiss: () -> Unit) {
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.onboarding_start), color = BrandCyan, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.onboarding_start), fontWeight = FontWeight.Bold)
             }
         },
     )
@@ -303,6 +318,10 @@ fun OnboardingDialog(onDismiss: () -> Unit) {
  *  - 保存并结束:已经骑完但没来得及点结束 —— 直接收尾成一条完整记录。
  *  - 丢弃:那次是误触发 / 数据无意义 —— 连同轨迹点一起删掉。
  * 弹窗不可点击外部关闭:必须显式选择,避免"随手关掉"后残留记录永远悬在库里。
+ *
+ * ⚠️ 配色契约:与 [OnboardingDialog] 同理,**跟随主题**。
+ * 除"丢弃"使用语义化的 `colorScheme.error`(危险操作需在两种主题下都醒目)外,
+ * 其余一律用 M3 默认色,不写死物理色。
  */
 @Composable
 fun RideRecoveryDialog(
@@ -314,9 +333,6 @@ fun RideRecoveryDialog(
     val units = AppTheme.units
     AlertDialog(
         onDismissRequest = { /* 必须显式选择 */ },
-        containerColor = CardBg,
-        titleContentColor = SpeedText,
-        textContentColor = DataLabel,
         title = { Text(stringResource(R.string.recover_title), fontWeight = FontWeight.ExtraBold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -329,22 +345,22 @@ fun RideRecoveryDialog(
                     ),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
-                    color = BrandCyan,
+                    color = MaterialTheme.colorScheme.primary,
                     fontFamily = FontFamily.Monospace,
                 )
             }
         },
         confirmButton = {
             TextButton(onClick = onResume) {
-                Text(stringResource(R.string.recover_resume), color = BrandCyan, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.recover_resume), fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
             TextButton(onClick = onFinalize) {
-                Text(stringResource(R.string.recover_finalize), color = DataValue)
+                Text(stringResource(R.string.recover_finalize))
             }
             TextButton(onClick = onDiscard) {
-                Text(stringResource(R.string.recover_discard), color = StopRed)
+                Text(stringResource(R.string.recover_discard), color = MaterialTheme.colorScheme.error)
             }
         },
     )

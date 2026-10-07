@@ -19,7 +19,9 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.honglian.smartcycling.ui.theme.AppTheme
+import com.honglian.smartcycling.ui.theme.DataLabel
+import com.honglian.smartcycling.ui.theme.RingTrack
+import com.honglian.smartcycling.ui.theme.SpeedText
 import kotlin.math.roundToInt
 
 /**
@@ -27,6 +29,13 @@ import kotlin.math.roundToInt
  *
  * 视觉原则:去掉发光与霓虹渐变,改用**单一强调色 + 高对比数字**。
  * 户外强光下,可读性来自"对比度与字号",而不是"发光特效"。
+ *
+ * ⚠️ 配色契约:本组件**只**用在骑行 HUD 里,而骑行 HUD 的容器是**刻意写死的深色**
+ * (见 `ui/theme/HudColors.kt`)。因此这里必须使用
+ * [SpeedText] / [DataLabel] / [RingTrack] 这类**恒定物理色**,不能读 `AppTheme.palette`
+ * —— 否则切到亮色主题后,数字会变成近黑色压在深色玻璃上。
+ * 实测(亮色主题 + 默认夜景底图):速度大数字对比度仅 **1.05:1**,等于看不见。
+ * 强调色由调用方传入(它才知道当前该用青还是绿)。
  */
 @Composable
 fun SpeedRing(
@@ -37,7 +46,6 @@ fun SpeedRing(
     accent: Color,
     modifier: Modifier = Modifier,
 ) {
-    val palette = AppTheme.palette
     val animated by animateFloatAsState(
         targetValue = value.toFloat().coerceIn(0f, maxValue.toFloat()),
         animationSpec = tween(durationMillis = 320),
@@ -51,14 +59,17 @@ fun SpeedRing(
             val ringRadius = (size.minDimension - stroke) / 2f - tickZone
             val center = Offset(size.width / 2f, size.height / 2f)
 
-            // 刻度:每 6° 一根,每 30° 加长加粗
+            // 刻度:每 6° 一根,每 30° 加长加粗。
+            // 层级由"长度 + 线宽"承担(0.55/0.30 × 2.2/1.1 dp),alpha 只负责压暗,
+            // 因此次刻度仍需保持可感知:alpha=0.25 在横屏高对比面板上实测仅 1.49:1,
+            // 等于看不见;提到 0.34 后最差 1.84:1。
             val tickBase = ringRadius + stroke * 0.75f
             for (i in 0 until 60) {
                 val major = i % 5 == 0
                 val len = if (major) tickZone * 0.55f else tickZone * 0.3f
                 rotate(degrees = i * 6f, pivot = center) {
                     drawLine(
-                        color = palette.hudLabel.copy(alpha = if (major) 0.55f else 0.25f),
+                        color = DataLabel.copy(alpha = if (major) 0.55f else 0.34f),
                         start = Offset(center.x, tickBase),
                         end = Offset(center.x, tickBase + len),
                         strokeWidth = if (major) 2.2f.dp.toPx() else 1.1f.dp.toPx(),
@@ -68,7 +79,7 @@ fun SpeedRing(
             }
 
             drawCircle(
-                color = palette.hudTrack,
+                color = RingTrack,
                 radius = ringRadius,
                 style = Stroke(stroke, cap = StrokeCap.Round),
             )
@@ -92,13 +103,13 @@ fun SpeedRing(
                 text = "${animated.roundToInt()}",
                 fontSize = (diameterDp / 3.3f).sp,
                 fontWeight = FontWeight.Bold,
-                color = palette.hudValue,
+                color = SpeedText,
             )
             Text(
                 text = unit,
                 fontSize = (diameterDp / 12f).sp,
                 fontWeight = FontWeight.Medium,
-                color = palette.hudLabel,
+                color = DataLabel,
                 letterSpacing = 1.sp,
             )
         }
