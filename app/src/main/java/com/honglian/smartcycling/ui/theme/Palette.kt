@@ -64,9 +64,23 @@ private val LightPalette = AppPalette(
     onPrimary = Color(0xFFFFFFFF),
     primaryContainer = Color(0xFFE3EDFE),
     onPrimaryContainer = Color(0xFF0B3E8F),
-    success = Color(0xFF12A150),
-    warning = Color(0xFFE08700),
-    danger = Color(0xFFE5484D),
+    // ------------------------------------------------------------------
+    // 亮色下的三个强调色都被当作**正文/标签文字**使用,所以必须按文字标准
+    // (WCAG AA >= 4.5:1)校验,不能只按"图标/色块"的 3:1 来选。
+    // 实际用途:配对页的蓝牙/定位告警与连接状态、离线地图的导入结果与删除确认、
+    // 设置页的"清空数据"、以及对话框里的危险操作按钮。
+    //
+    // 原值在 App 背景 #F4F6F9 上实测(对白底/浅灰底取最差值):
+    //   success #12A150 = 3.11:1   warning #E08700 = 2.54:1   danger #E5484D = 3.61:1
+    // 三者全部不达标 —— 即整个亮色主题的强调色都不满足正文可读性。
+    // 加深后(最差值 / 白底值):
+    //   success #0B7A3D = 5.02 / 5.43
+    //   warning #9C5D00 = 4.87 / 5.28
+    //   danger  #C93034 = 4.90 / 5.31
+    // 只改亮色:暗色下 #35D07F / #FFB020 / #FF5A5F 在深底上是 5.7~9.6:1,本就达标。
+    success = Color(0xFF0B7A3D),
+    warning = Color(0xFF9C5D00),
+    danger = Color(0xFFC93034),
     textPrimary = Color(0xFF111827),
     textSecondary = Color(0xFF5B6875),
     textTertiary = Color(0xFF8B96A3),
